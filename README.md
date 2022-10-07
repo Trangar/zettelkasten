@@ -17,4 +17,5 @@ Rust implementation of https://en.wikipedia.org/wiki/Zettelkasten
     - Right is a markdown preview
   - Links in pages `[Page]` will auto-link to other pages, if they don't exist a red link will be shown
   - Going 1 page back will actually go a page back (properly push browser history)
+  - Ability to upload images with drag+drop or ctrl+V
 - Database backed (postgres/sqlite)
