@@ -1,0 +1,18 @@
+[package]
+name = "zettelkasten-shared"
+version = "0.0.0"
+edition = "2021"
+
+[features]
+runtime-async-std = ["sqlx/runtime-async-std-rustls"]
+
+[dependencies]
+async-trait = { version = "0.1.57", default-features = false }
+bcrypt = { version = "0.13.0", default-features = false }
+futures = { version = "0.3.24", default-features = false, features = ["alloc"] }
+serde = { version = "1.0.145", default-features = false }
+
+[dependencies.sqlx]
+version = "*"
+default-features = false
+features = ["macros", "migrate"]

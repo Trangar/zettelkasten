@@ -1,0 +1,17 @@
+[package]
+name = "zettelkasten-sqlite"
+version = "0.0.0"
+edition = "2021"
+
+[features]
+runtime-async-std = ["sqlx/runtime-async-std-rustls"]
+
+[dependencies]
+zettelkasten-shared = { version = "0.0.0", path = "../../shared" }
+async-lock = { version = "2.5.0", default-features = false }
+bcrypt = { version = "0.13.0", default-features = false, features = ["alloc"] }
+
+[dependencies.sqlx]
+version = "0.6.2"
+default-features = false
+features = ["sqlite", "migrate", "macros"]
