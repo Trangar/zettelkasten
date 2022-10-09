@@ -1,6 +1,6 @@
 use async_lock::Mutex;
-use sqlx::Connection as _;
-use std::sync::Arc;
+use sqlx::{Connection as _, Executor};
+use std::{collections::HashMap, sync::Arc};
 use zettelkasten_shared::{
     futures::{future::LocalBoxFuture, FutureExt},
     storage,
@@ -12,6 +12,11 @@ pub struct Connection {
 
 #[zettelkasten_shared::async_trait]
 impl storage::Storage for Connection {
+    async fn login_single_user(&self) -> Result<storage::User, storage::Error> {
+        let maybe_user = self.login("root", "").await?;
+        maybe_user.ok_or(storage::Error::SingleUserNotFound)
+    }
+
     async fn login(
         &self,
         username: &str,
@@ -19,7 +24,7 @@ impl storage::Storage for Connection {
     ) -> Result<Option<storage::User>, storage::Error> {
         let user = sqlx::query_as!(
             storage::User,
-            "SELECT user_id as id, username as name, password FROM users WHERE username = ?",
+            "SELECT user_id as id, username as name, password, last_visited_page FROM users WHERE username = ?",
             username,
         )
         .fetch_optional(&mut *self.conn.lock().await)
@@ -84,12 +89,39 @@ impl storage::ConnectableStorage for Connection {
         async move {
             let mut connection = sqlx::SqliteConnection::connect(&connection_args).await?;
             sqlx::migrate!().run(&mut connection).await?;
-            let config = storage::SystemConfig::default();
             let connection = Connection {
                 conn: Arc::new(Mutex::new(connection)),
             };
+
+            let config = connection.load_config().await?;
+            dbg!(&config);
+
             Ok((connection, config))
         }
         .boxed_local()
+    }
+}
+
+impl Connection {
+    async fn load_config(&self) -> Result<storage::SystemConfig, storage::Error> {
+        // load all the key-value entries from the database
+        let result = sqlx::query!("SELECT key, value FROM config")
+            .fetch_all(&mut *self.conn.lock().await)
+            .await?;
+
+        dbg!(&result);
+        // Map them into a `serde_json::Map`
+        let map: serde_json::Map<String, serde_json::Value> = match result
+            .into_iter()
+            .map(|o| Ok((o.key, serde_json::from_str(&o.value)?)))
+            .collect()
+        {
+            Ok(map) => map,
+            Err(inner) => return Err(storage::Error::JsonDeserializeError { inner }),
+        };
+
+        // Now we can deserialize this from a `serde_json::Value::Object(map)`
+        serde_json::from_value(serde_json::Value::Object(map))
+            .map_err(|inner| storage::Error::JsonDeserializeError { inner })
     }
 }

@@ -7,6 +7,7 @@ pub type UserId = i64;
 
 #[async_trait]
 pub trait Storage: Send + Sync {
+    async fn login_single_user(&self) -> Result<User, Error>;
     async fn login(&self, username: &str, password: &str) -> Result<Option<User>, Error>;
     async fn register(&self, username: &str, password: &str) -> Result<Option<User>, Error>;
     async fn get_pages(
@@ -31,6 +32,7 @@ pub struct User {
     pub id: UserId,
     pub name: String,
     pub password: String,
+    pub last_visited_page: Option<PageId>,
 }
 
 pub struct SearchOpts {}
@@ -63,6 +65,9 @@ pub enum Error {
     Sqlx { inner: sqlx::Error },
     SqlxMigrate { inner: sqlx::migrate::MigrateError },
     Bcrypt { inner: bcrypt::BcryptError },
+    JsonDeserializeError { inner: serde_json::Error },
+
+    SingleUserNotFound,
 }
 
 impl From<sqlx::Error> for Error {
@@ -83,13 +88,15 @@ impl From<bcrypt::BcryptError> for Error {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct SystemConfig {
+    #[serde(default)]
     pub user_mode: UserMode,
+    #[serde(default)]
     pub terminal_editor: Option<PathBuf>,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
 pub enum UserMode {
     SingleUserAutoLogin,
     #[default]
