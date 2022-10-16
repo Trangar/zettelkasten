@@ -1,6 +1,6 @@
 use async_lock::Mutex;
-use sqlx::{Connection as _, Executor};
-use std::{collections::HashMap, sync::Arc};
+use sqlx::ConnectOptions as _;
+use std::{str::FromStr, sync::Arc};
 use zettelkasten_shared::{
     futures::{future::LocalBoxFuture, FutureExt},
     storage,
@@ -24,7 +24,7 @@ impl storage::Storage for Connection {
     ) -> Result<Option<storage::User>, storage::Error> {
         let user = sqlx::query_as!(
             storage::User,
-            "SELECT user_id as id, username as name, password, last_visited_page FROM users WHERE username = ?",
+            "SELECT user_id as id, username as name, password, last_visited_zettel FROM users WHERE username = ?",
             username,
         )
         .fetch_optional(&mut *self.conn.lock().await)
@@ -47,34 +47,34 @@ impl storage::Storage for Connection {
         todo!()
     }
 
-    async fn get_pages(
+    async fn get_zettels(
         &self,
         user: storage::UserId,
         search: Option<storage::SearchOpts>,
-    ) -> Result<Vec<storage::PageHeader>, storage::Error> {
+    ) -> Result<Vec<storage::ZettelHeader>, storage::Error> {
         todo!()
     }
 
-    async fn get_page(
+    async fn get_zettel(
         &self,
         user: storage::UserId,
-        id: storage::PageId,
-    ) -> Result<Vec<storage::Page>, storage::Error> {
+        id: storage::ZettelId,
+    ) -> Result<Vec<storage::Zettel>, storage::Error> {
         todo!()
     }
 
-    async fn get_page_by_url(
+    async fn get_zettel_by_url(
         &self,
         user: storage::UserId,
         url: &str,
-    ) -> Result<Option<storage::Page>, storage::Error> {
+    ) -> Result<Option<storage::Zettel>, storage::Error> {
         todo!()
     }
 
-    async fn update_page(
+    async fn update_zettel(
         &self,
         user: storage::UserId,
-        page: &storage::Page,
+        zettel: &storage::Zettel,
     ) -> Result<(), storage::Error> {
         todo!()
     }
@@ -87,7 +87,12 @@ impl storage::ConnectableStorage for Connection {
         connection_args: Self::ConnectionArgs,
     ) -> LocalBoxFuture<'a, Result<(Self, storage::SystemConfig), storage::Error>> {
         async move {
-            let mut connection = sqlx::SqliteConnection::connect(&connection_args).await?;
+            println!("Opening {connection_args:?}");
+            let mut connection = sqlx::sqlite::SqliteConnectOptions::from_str(&connection_args)
+                .expect("Invalid SQLite connection string")
+                .create_if_missing(true)
+                .connect()
+                .await?;
             sqlx::migrate!().run(&mut connection).await?;
             let connection = Connection {
                 conn: Arc::new(Mutex::new(connection)),

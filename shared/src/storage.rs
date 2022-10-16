@@ -2,7 +2,7 @@ use crate::async_trait;
 use futures::future::LocalBoxFuture;
 use std::path::PathBuf;
 
-pub type PageId = i64;
+pub type ZettelId = i64;
 pub type UserId = i64;
 
 #[async_trait]
@@ -10,14 +10,14 @@ pub trait Storage: Send + Sync {
     async fn login_single_user(&self) -> Result<User, Error>;
     async fn login(&self, username: &str, password: &str) -> Result<Option<User>, Error>;
     async fn register(&self, username: &str, password: &str) -> Result<Option<User>, Error>;
-    async fn get_pages(
+    async fn get_zettels(
         &self,
         user: UserId,
         search: Option<SearchOpts>,
-    ) -> Result<Vec<PageHeader>, Error>;
-    async fn get_page(&self, user: UserId, id: PageId) -> Result<Vec<Page>, Error>;
-    async fn get_page_by_url(&self, user: UserId, url: &str) -> Result<Option<Page>, Error>;
-    async fn update_page(&self, user: UserId, page: &Page) -> Result<(), Error>;
+    ) -> Result<Vec<ZettelHeader>, Error>;
+    async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Vec<Zettel>, Error>;
+    async fn get_zettel_by_url(&self, user: UserId, url: &str) -> Result<Option<Zettel>, Error>;
+    async fn update_zettel(&self, user: UserId, zettel: &Zettel) -> Result<(), Error>;
 }
 
 pub trait ConnectableStorage: Storage + Sized {
@@ -32,22 +32,22 @@ pub struct User {
     pub id: UserId,
     pub name: String,
     pub password: String,
-    pub last_visited_page: Option<PageId>,
+    pub last_visited_zettel: Option<ZettelId>,
 }
 
 pub struct SearchOpts {}
 
 #[derive(sqlx::FromRow)]
-pub struct PageHeader {
-    pub id: PageId,
+pub struct ZettelHeader {
+    pub id: ZettelId,
     pub url: String,
     pub title: String,
     pub highlight_text: Option<String>,
 }
 
 #[derive(sqlx::FromRow)]
-pub struct Page {
-    pub id: PageId,
+pub struct Zettel {
+    pub id: ZettelId,
     pub url: String,
     pub title: String,
     pub body: String,

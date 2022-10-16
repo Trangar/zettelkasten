@@ -1,3 +1,5 @@
+mod view;
+
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -7,29 +9,17 @@ use std::{io::Stdout, sync::Arc};
 use tui::{
     backend::CrosstermBackend,
     widgets::{Block, Borders},
-    Terminal,
 };
 use zettelkasten_shared::{storage, Front};
 
+pub type Terminal = tui::Terminal<CrosstermBackend<Stdout>>;
+
 pub struct Tui {
-    terminal: Terminal<CrosstermBackend<Stdout>>,
+    terminal: Terminal,
     system_config: storage::SystemConfig,
     storage: Arc<dyn storage::Storage>,
     running: bool,
-    state: TuiState,
-}
-
-enum TuiState {
-    NotLoggedIn { username: String, password: String },
-}
-
-impl Default for TuiState {
-    fn default() -> Self {
-        Self::NotLoggedIn {
-            username: String::new(),
-            password: String::new(),
-        }
-    }
+    state: view::View,
 }
 
 impl Front for Tui {
@@ -46,16 +36,29 @@ impl Front for Tui {
 
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend).unwrap();
+        let state = view::View::new(&system_config, &storage);
         let mut tui = Self {
             terminal,
             system_config,
             storage,
             running: true,
-            state: TuiState::default(),
+            state,
         };
+        let mut i = 0;
         while tui.running {
-            tui.render().expect("Could not render TUI");
-            tui.update().expect("Could not update TUI");
+            let keycode = view::alert(&mut tui.terminal, |f| {
+                f.title("Could not render page")
+                    .text(format!("Not implemented ({i})"))
+                    .action(KeyCode::Char('q'), "quit")
+                    .action(KeyCode::Char('c'), "continue")
+            });
+            match keycode {
+                KeyCode::Char('q') => return,
+                KeyCode::Char('c') => {
+                    i += 1;
+                }
+                _ => unreachable!(),
+            }
         }
     }
 }
