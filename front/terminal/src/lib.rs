@@ -5,19 +5,31 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use snafu::ResultExt;
 use std::{io::Stdout, sync::Arc};
 use tui::backend::CrosstermBackend;
 use zettelkasten_shared::{storage, Front};
 
-pub type Terminal = tui::Terminal<CrosstermBackend<Stdout>>;
+pub(crate) type Terminal = tui::Terminal<CrosstermBackend<Stdout>>;
 
 pub struct Tui {
-    terminal: Terminal,
-    #[allow(dead_code)]
-    system_config: storage::SystemConfig,
-    storage: Arc<dyn storage::Storage>,
-    running: bool,
-    view: view::View,
+    pub(crate) terminal: Terminal,
+    pub(crate) system_config: storage::SystemConfig,
+    pub(crate) storage: Arc<dyn storage::Storage>,
+    pub(crate) running: bool,
+}
+
+impl Tui {
+    pub(crate) fn can_register(&self) -> view::Result<bool> {
+        match self.system_config.user_mode {
+            storage::UserMode::MultiUser => Ok(true),
+            _ => {
+                let user_count = zettelkasten_shared::block_on(self.storage.user_count())
+                    .context(view::DatabaseSnafu)?;
+                Ok(user_count == 0)
+            }
+        }
+    }
 }
 
 impl Front for Tui {
@@ -35,20 +47,17 @@ impl Front for Tui {
 
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend).expect("Could not instantiate the terminal");
-        let view = view::View::new(&system_config, &storage);
+        let mut view = view::View::new(&system_config, &storage);
         let mut tui = Self {
             terminal,
             system_config,
             storage,
             running: true,
-            view,
         };
+
         while tui.running {
-            match tui
-                .view
-                .render(&mut tui.running, &mut tui.terminal, &tui.storage)
-            {
-                Ok(Some(next_state)) => tui.view = next_state,
+            match view.render(&mut tui) {
+                Ok(Some(next_state)) => view = next_state,
                 Ok(None) => {}
                 Err(e) => {
                     let keycode = view::alert(&mut tui.terminal, |f| {

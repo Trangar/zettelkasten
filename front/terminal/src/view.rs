@@ -1,5 +1,6 @@
 mod logged_in;
-mod not_logged_in;
+mod login;
+mod register;
 
 use crossterm::event::{Event, KeyCode};
 use snafu::{ResultExt, Snafu};
@@ -11,13 +12,14 @@ use tui::{
 use zettelkasten_shared::storage;
 
 pub enum View {
-    NotLoggedIn(not_logged_in::NotLoggedIn),
+    Login(login::Login),
+    Register(register::Register),
     LoggedIn(logged_in::LoggedIn),
 }
 
-impl From<not_logged_in::NotLoggedIn> for View {
-    fn from(v: not_logged_in::NotLoggedIn) -> Self {
-        Self::NotLoggedIn(v)
+impl From<login::Login> for View {
+    fn from(v: login::Login) -> Self {
+        Self::Login(v)
     }
 }
 
@@ -35,8 +37,8 @@ impl View {
                     // Successfully logged in
                     Ok(user) => Self::LoggedIn(user.into()),
                     // Failed to log in, show the login view and the error
-                    Err(source) => not_logged_in::NotLoggedIn {
-                        error: Some(not_logged_in::LoginError::Storage { source }),
+                    Err(source) => login::Login {
+                        error: Some(login::LoginError::Storage { source }),
                         ..Default::default()
                     }
                     .into(),
@@ -44,29 +46,39 @@ impl View {
             }
             storage::UserMode::MultiUser | storage::UserMode::SingleUserManualLogin => {
                 // show the login view
-                not_logged_in::NotLoggedIn::default().into()
+                login::Login::default().into()
             }
         }
     }
 
-    pub(crate) fn render(
-        &mut self,
-        running: &mut bool,
-        terminal: &mut super::Terminal,
-        storage: &Arc<dyn storage::Storage>,
-    ) -> Result<Option<View>> {
+    pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> Result<Option<View>> {
         let next = match self {
-            Self::LoggedIn(li) => li
-                .render(terminal)?
-                .map(|logged_in::Transition::Logout| Self::NotLoggedIn(Default::default())),
-            Self::NotLoggedIn(nli) => match nli.render(terminal, storage)? {
-                Some(not_logged_in::Transition::Exit) => {
-                    *running = false;
+            Self::LoggedIn(li) => match li.render(tui)? {
+                Some(logged_in::Transition::Exit) => {
+                    tui.running = false;
+                    return Ok(None);
+                }
+                Some(logged_in::Transition::Logout) => Some(Self::Login(Default::default())),
+                None => None,
+            },
+            Self::Login(login) => match login.render(tui)? {
+                Some(login::Transition::Exit) => {
+                    tui.running = false;
                     None
                 }
-                Some(not_logged_in::Transition::Login { user }) => {
+                Some(login::Transition::Register) => Some(Self::Register(Default::default())),
+                Some(login::Transition::Login { user }) => Some(Self::LoggedIn(user.into())),
+                None => None,
+            },
+            Self::Register(reg) => match reg.render(tui)? {
+                Some(register::Transition::Exit) => {
+                    tui.running = false;
+                    None
+                }
+                Some(register::Transition::Registered { user }) => {
                     Some(Self::LoggedIn(user.into()))
                 }
+                Some(register::Transition::Login) => Some(Self::Login(Default::default())),
                 None => None,
             },
         };
@@ -77,6 +89,7 @@ impl View {
 pub type Result<T = ()> = std::result::Result<T, ViewError>;
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
 pub enum ViewError {
     #[snafu(display("Could not retrieve the terminal size"))]
     TerminalSize { source: std::io::Error },

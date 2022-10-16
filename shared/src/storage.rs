@@ -7,9 +7,10 @@ pub type UserId = i64;
 
 #[async_trait]
 pub trait Storage: Send + Sync {
+    async fn user_count(&self) -> Result<u64, Error>;
     async fn login_single_user(&self) -> Result<User, Error>;
     async fn login(&self, username: &str, password: &str) -> Result<Option<User>, Error>;
-    async fn register(&self, username: &str, password: &str) -> Result<Option<User>, Error>;
+    async fn register(&self, username: &str, password: &str) -> Result<User, Error>;
     async fn get_zettels(
         &self,
         user: UserId,
@@ -69,6 +70,7 @@ pub enum Error {
     SqlxMigrate { source: sqlx::migrate::MigrateError },
 
     SingleUserNotFound,
+    UserAlreadyExists,
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]

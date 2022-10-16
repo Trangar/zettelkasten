@@ -14,6 +14,15 @@ pub struct Connection {
 #[allow(unused_variables)]
 #[zettelkasten_shared::async_trait]
 impl storage::Storage for Connection {
+    async fn user_count(&self) -> Result<u64, storage::Error> {
+        let query = sqlx::query!("SELECT COUNT(*) as count FROM users");
+        query
+            .fetch_one(&mut *self.conn.lock().await)
+            .await
+            .map(|result| result.count as u64)
+            .context(storage::SqlxSnafu)
+    }
+
     async fn login_single_user(&self) -> Result<storage::User, storage::Error> {
         let maybe_user = self.login("root", "").await?;
         maybe_user.ok_or(storage::Error::SingleUserNotFound)
@@ -24,14 +33,15 @@ impl storage::Storage for Connection {
         username: &str,
         password: &str,
     ) -> Result<Option<storage::User>, storage::Error> {
-        let user = sqlx::query_as!(
+        let query = sqlx::query_as!(
             storage::User,
             "SELECT user_id as id, username as name, password, last_visited_zettel FROM users WHERE username = ?",
             username,
-        )
-        .fetch_optional(&mut *self.conn.lock().await)
-        .await
-        .context(storage::SqlxSnafu)?;
+        );
+        let user = query
+            .fetch_optional(&mut *self.conn.lock().await)
+            .await
+            .context(storage::SqlxSnafu)?;
 
         if let Some(user) = user {
             if bcrypt::verify(password, &user.password).context(storage::BcryptSnafu)? {
@@ -46,8 +56,36 @@ impl storage::Storage for Connection {
         &self,
         username: &str,
         password: &str,
-    ) -> Result<Option<storage::User>, storage::Error> {
-        todo!()
+    ) -> Result<storage::User, storage::Error> {
+        let mut conn = self.conn.lock().await;
+        let query = sqlx::query!(
+            "SELECT COUNT(user_id) as count FROM users WHERE username = ?",
+            username
+        );
+        let user = query
+            .fetch_one(&mut *conn)
+            .await
+            .context(storage::SqlxSnafu)?;
+
+        if user.count != 0 {
+            return Err(storage::Error::UserAlreadyExists);
+        }
+
+        let password =
+            bcrypt::hash(password, bcrypt::DEFAULT_COST).context(storage::BcryptSnafu)?;
+
+        let query = sqlx::query_as!(
+            storage::User,
+            r#"INSERT INTO users (username, password) VALUES (?, ?) RETURNING user_id as "id!", username as "name!", password as "password!", last_visited_zettel"#,
+            username,
+            password
+        );
+        let user = query
+            .fetch_one(&mut *conn)
+            .await
+            .context(storage::SqlxSnafu)?;
+
+        Ok(user)
     }
 
     async fn get_zettels(
