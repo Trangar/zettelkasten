@@ -15,7 +15,7 @@ pub trait Storage: Send + Sync {
         user: UserId,
         search: Option<SearchOpts>,
     ) -> Result<Vec<ZettelHeader>, Error>;
-    async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Vec<Zettel>, Error>;
+    async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Zettel, Error>;
     async fn get_zettel_by_url(&self, user: UserId, url: &str) -> Result<Option<Zettel>, Error>;
     async fn update_zettel(&self, user: UserId, zettel: &Zettel) -> Result<(), Error>;
 }

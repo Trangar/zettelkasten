@@ -10,6 +10,7 @@ pub struct Connection {
     conn: Arc<Mutex<sqlx::SqliteConnection>>,
 }
 
+#[allow(unused_variables)]
 #[zettelkasten_shared::async_trait]
 impl storage::Storage for Connection {
     async fn login_single_user(&self) -> Result<storage::User, storage::Error> {
@@ -59,7 +60,7 @@ impl storage::Storage for Connection {
         &self,
         user: storage::UserId,
         id: storage::ZettelId,
-    ) -> Result<Vec<storage::Zettel>, storage::Error> {
+    ) -> Result<storage::Zettel, storage::Error> {
         todo!()
     }
 

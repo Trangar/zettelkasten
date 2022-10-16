@@ -2,9 +2,9 @@ mod logged_in;
 mod not_logged_in;
 
 use crossterm::event::{Event, KeyCode};
+use snafu::ResultExt;
 use std::{borrow::Cow, sync::Arc};
 use tui::{
-    layout::Rect,
     text::{Spans, Text},
     widgets::{Block, Borders, Paragraph},
 };
@@ -48,64 +48,90 @@ impl View {
             }
         }
     }
+
+    pub(crate) fn render(
+        &mut self,
+        running: &mut bool,
+        terminal: &mut super::Terminal,
+    ) -> Result<Option<View>> {
+        let next = match self {
+            Self::LoggedIn(li) => li
+                .render(terminal)?
+                .map(|logged_in::Transition::Logout| Self::NotLoggedIn(Default::default())),
+            Self::NotLoggedIn(nli) => match nli.render(terminal)? {
+                Some(not_logged_in::Transition::Exit) => {
+                    *running = false;
+                    None
+                }
+                Some(not_logged_in::Transition::Login { user }) => {
+                    Some(Self::LoggedIn(user.into()))
+                }
+                None => None,
+            },
+        };
+        Ok(next)
+    }
 }
 
-pub fn alert<F>(terminal: &mut super::Terminal, cb: F) -> KeyCode
+pub type Result<T = ()> = std::result::Result<T, ViewError>;
+
+#[derive(Debug, snafu::Snafu)]
+pub enum ViewError {
+    #[snafu(display("Could not retrieve the terminal size"))]
+    TerminalSize { source: std::io::Error },
+    #[snafu(display("Could not render a frame"))]
+    RenderFrame { source: std::io::Error },
+    #[snafu(display("Could not get the next terminal event"))]
+    Event { source: std::io::Error },
+}
+
+pub fn alert<F>(terminal: &mut super::Terminal, cb: F) -> Result<KeyCode>
 where
     F: Fn(ViewBuilder) -> ViewBuilder,
 {
     loop {
-        let size = terminal.size().unwrap();
+        let size = terminal.size().context(TerminalSizeSnafu)?;
         let builder = ViewBuilder::default();
         let builder = cb(builder);
         terminal
             .draw(|f| {
                 let mut lines = Vec::<Spans>::with_capacity(
-                    builder.lines.len() + if builder.actions.is_empty() { 0 } else { 1 },
+                    builder.lines.len() + if builder.actions.is_empty() { 0 } else { 2 },
                 );
                 for line in &builder.lines {
                     lines.push(line.as_ref().into());
                 }
-                let mut actions = String::new();
-                for (idx, (key, text)) in builder.actions.iter().enumerate() {
-                    if idx != 0 {
-                        actions += ", ";
+                if !builder.actions.is_empty() {
+                    lines.push(Spans::default());
+                    let mut actions = String::new();
+                    for (idx, (key, text)) in builder.actions.iter().enumerate() {
+                        if idx != 0 {
+                            actions += ", ";
+                        }
+                        match key {
+                            KeyCode::Char(c) => actions.push(*c),
+                            KeyCode::Enter => actions += "<enter>",
+                            _ => unreachable!(),
+                        }
+                        actions += ": ";
+                        actions += text;
                     }
-                    match key {
-                        KeyCode::Char(c) => actions.push(*c),
-                        KeyCode::Enter => actions += "<enter>",
-                        _ => unreachable!(),
-                    }
-                    actions += ": ";
-                    actions += text;
+                    lines.push(actions.into());
                 }
-                lines.push(actions.into());
                 let mut block = Block::default().borders(Borders::ALL);
                 if let Some(title) = &builder.title {
                     block = block.title(title.as_ref());
                 }
-                const VERT_MARGIN: u16 = 2;
-                const HOR_MARGIN: u16 = 6;
-                let x = (size.width - (builder.width + HOR_MARGIN)) / 2;
-                let y = (size.height - (builder.height + VERT_MARGIN)) / 2;
 
                 let paragraph = Paragraph::new(Text { lines }).block(block);
-                f.render_widget(
-                    paragraph,
-                    Rect::new(
-                        x,
-                        y,
-                        builder.width + HOR_MARGIN,
-                        builder.height + VERT_MARGIN,
-                    ),
-                )
+                f.render_widget(paragraph, size)
             })
-            .unwrap();
+            .context(RenderFrameSnafu)?;
 
-        let event = crossterm::event::read().unwrap();
+        let event = crossterm::event::read().context(EventSnafu)?;
         if let Event::Key(key) = event {
             if builder.actions.iter().any(|(k, _)| k == &key.code) {
-                break key.code;
+                break Ok(key.code);
             }
         }
     }

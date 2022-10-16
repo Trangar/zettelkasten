@@ -9,3 +9,15 @@ impl From<storage::User> for LoggedIn {
         Self { user }
     }
 }
+impl LoggedIn {
+    pub(crate) fn render(
+        &self,
+        _terminal: &mut crate::Terminal,
+    ) -> super::Result<Option<Transition>> {
+        todo!()
+    }
+}
+
+pub enum Transition {
+    Logout,
+}
