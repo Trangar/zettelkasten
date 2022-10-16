@@ -18,6 +18,7 @@ impl LoggedIn {
     }
 }
 
+#[allow(dead_code)]
 pub enum Transition {
     Logout,
 }

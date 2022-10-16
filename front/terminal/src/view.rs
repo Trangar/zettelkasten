@@ -35,8 +35,8 @@ impl View {
                     // Successfully logged in
                     Ok(user) => Self::LoggedIn(user.into()),
                     // Failed to log in, show the login view and the error
-                    Err(e) => not_logged_in::NotLoggedIn {
-                        error: Some(not_logged_in::LoginError::Storage(e)),
+                    Err(source) => not_logged_in::NotLoggedIn {
+                        error: Some(not_logged_in::LoginError::Storage { source }),
                         ..Default::default()
                     }
                     .into(),
