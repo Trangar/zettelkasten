@@ -7,10 +7,11 @@ edition = "2021"
 runtime-async-std = ["sqlx/runtime-async-std-rustls"]
 
 [dependencies]
-zettelkasten-shared = { version = "0.0.0", path = "../../shared" }
 async-lock = { version = "2.5.0", default-features = false }
 bcrypt = { version = "0.13.0", default-features = false, features = ["alloc"] }
 serde_json = { version = "1.0.85", default-features = false }
+snafu = { version = "0.7.2", default-features = false }
+zettelkasten-shared = { version = "0.0.0", path = "../../shared" }
 
 [dependencies.sqlx]
 version = "0.6.2"

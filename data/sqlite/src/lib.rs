@@ -1,4 +1,5 @@
 use async_lock::Mutex;
+use snafu::ResultExt;
 use sqlx::ConnectOptions as _;
 use std::{str::FromStr, sync::Arc};
 use zettelkasten_shared::{
@@ -29,10 +30,11 @@ impl storage::Storage for Connection {
             username,
         )
         .fetch_optional(&mut *self.conn.lock().await)
-        .await?;
+        .await
+        .context(storage::SqlxSnafu)?;
 
         if let Some(user) = user {
-            if bcrypt::verify(password, &user.password)? {
+            if bcrypt::verify(password, &user.password).context(storage::BcryptSnafu)? {
                 return Ok(Some(user));
             }
         }
@@ -93,8 +95,12 @@ impl storage::ConnectableStorage for Connection {
                 .expect("Invalid SQLite connection string")
                 .create_if_missing(true)
                 .connect()
-                .await?;
-            sqlx::migrate!().run(&mut connection).await?;
+                .await
+                .context(storage::SqlxSnafu)?;
+            sqlx::migrate!()
+                .run(&mut connection)
+                .await
+                .context(storage::SqlxMigrateSnafu)?;
             let connection = Connection {
                 conn: Arc::new(Mutex::new(connection)),
             };
@@ -113,21 +119,18 @@ impl Connection {
         // load all the key-value entries from the database
         let result = sqlx::query!("SELECT key, value FROM config")
             .fetch_all(&mut *self.conn.lock().await)
-            .await?;
+            .await
+            .context(storage::SqlxSnafu)?;
 
-        dbg!(&result);
         // Map them into a `serde_json::Map`
-        let map: serde_json::Map<String, serde_json::Value> = match result
+        let map: serde_json::Map<String, serde_json::Value> = result
             .into_iter()
             .map(|o| Ok((o.key, serde_json::from_str(&o.value)?)))
-            .collect()
-        {
-            Ok(map) => map,
-            Err(inner) => return Err(storage::Error::JsonDeserializeError { inner }),
-        };
+            .collect::<Result<_, _>>()
+            .context(storage::JsonDeserializeSnafu)?;
 
         // Now we can deserialize this from a `serde_json::Value::Object(map)`
         serde_json::from_value(serde_json::Value::Object(map))
-            .map_err(|inner| storage::Error::JsonDeserializeError { inner })
+            .context(storage::JsonDeserializeSnafu)
     }
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crossterm::event::{Event, KeyCode};
 use snafu::ResultExt;
 use tui::{
@@ -29,6 +31,7 @@ impl NotLoggedIn {
     pub(crate) fn render(
         &mut self,
         terminal: &mut crate::Terminal,
+        storage: &Arc<dyn storage::Storage>,
     ) -> super::Result<Option<Transition>> {
         loop {
             let paragraph = Paragraph::new(Text {
@@ -81,7 +84,7 @@ impl NotLoggedIn {
                     }
                     KeyCode::Enter => match self.cursor {
                         Cursor::Username => self.cursor = Cursor::Password,
-                        Cursor::Password => return self.try_login(),
+                        Cursor::Password => return self.try_login(storage),
                     },
                     KeyCode::Esc => return Ok(Some(Transition::Exit)),
                     _ => {}
@@ -90,8 +93,16 @@ impl NotLoggedIn {
         }
     }
 
-    fn try_login(&self) -> Result<Option<Transition>, super::ViewError> {
-        todo!()
+    fn try_login(
+        &self,
+        storage: &Arc<dyn storage::Storage>,
+    ) -> Result<Option<Transition>, super::ViewError> {
+        match zettelkasten_shared::block_on(storage.login(&self.username, &self.password))
+            .context(super::DatabaseSnafu)?
+        {
+            Some(user) => todo!(),
+            None => todo!(),
+        }
     }
 }
 

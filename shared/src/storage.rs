@@ -60,32 +60,15 @@ pub trait Attachment: Send + Sync {
     async fn load(&self) -> Vec<u8>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, snafu::Snafu)]
+#[snafu(visibility(pub))]
 pub enum Error {
-    Sqlx { inner: sqlx::Error },
-    SqlxMigrate { inner: sqlx::migrate::MigrateError },
-    Bcrypt { inner: bcrypt::BcryptError },
-    JsonDeserializeError { inner: serde_json::Error },
+    Bcrypt { source: bcrypt::BcryptError },
+    JsonDeserializeError { source: serde_json::Error },
+    Sqlx { source: sqlx::Error },
+    SqlxMigrate { source: sqlx::migrate::MigrateError },
 
     SingleUserNotFound,
-}
-
-impl From<sqlx::Error> for Error {
-    fn from(inner: sqlx::Error) -> Self {
-        Self::Sqlx { inner }
-    }
-}
-
-impl From<sqlx::migrate::MigrateError> for Error {
-    fn from(inner: sqlx::migrate::MigrateError) -> Self {
-        Self::SqlxMigrate { inner }
-    }
-}
-
-impl From<bcrypt::BcryptError> for Error {
-    fn from(inner: bcrypt::BcryptError) -> Self {
-        Self::Bcrypt { inner }
-    }
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]

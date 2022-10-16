@@ -2,7 +2,7 @@ mod logged_in;
 mod not_logged_in;
 
 use crossterm::event::{Event, KeyCode};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use std::{borrow::Cow, sync::Arc};
 use tui::{
     text::{Spans, Text},
@@ -53,12 +53,13 @@ impl View {
         &mut self,
         running: &mut bool,
         terminal: &mut super::Terminal,
+        storage: &Arc<dyn storage::Storage>,
     ) -> Result<Option<View>> {
         let next = match self {
             Self::LoggedIn(li) => li
                 .render(terminal)?
                 .map(|logged_in::Transition::Logout| Self::NotLoggedIn(Default::default())),
-            Self::NotLoggedIn(nli) => match nli.render(terminal)? {
+            Self::NotLoggedIn(nli) => match nli.render(terminal, storage)? {
                 Some(not_logged_in::Transition::Exit) => {
                     *running = false;
                     None
@@ -75,7 +76,7 @@ impl View {
 
 pub type Result<T = ()> = std::result::Result<T, ViewError>;
 
-#[derive(Debug, snafu::Snafu)]
+#[derive(Debug, Snafu)]
 pub enum ViewError {
     #[snafu(display("Could not retrieve the terminal size"))]
     TerminalSize { source: std::io::Error },
@@ -83,6 +84,8 @@ pub enum ViewError {
     RenderFrame { source: std::io::Error },
     #[snafu(display("Could not get the next terminal event"))]
     Event { source: std::io::Error },
+    #[snafu(display("Database error"))]
+    Database { source: storage::Error },
 }
 
 pub fn alert<F>(terminal: &mut super::Terminal, cb: F) -> Result<KeyCode>

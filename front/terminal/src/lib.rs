@@ -15,7 +15,6 @@ pub struct Tui {
     terminal: Terminal,
     #[allow(dead_code)]
     system_config: storage::SystemConfig,
-    #[allow(dead_code)]
     storage: Arc<dyn storage::Storage>,
     running: bool,
     view: view::View,
@@ -45,7 +44,10 @@ impl Front for Tui {
             view,
         };
         while tui.running {
-            match tui.view.render(&mut tui.running, &mut tui.terminal) {
+            match tui
+                .view
+                .render(&mut tui.running, &mut tui.terminal, &tui.storage)
+            {
                 Ok(Some(next_state)) => tui.view = next_state,
                 Ok(None) => {}
                 Err(e) => {
