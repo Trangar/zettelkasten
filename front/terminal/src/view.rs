@@ -1,6 +1,6 @@
-mod logged_in;
 mod login;
 mod register;
+mod zettel;
 
 use crossterm::event::{Event, KeyCode};
 use snafu::{ResultExt, Snafu};
@@ -14,7 +14,7 @@ use zettelkasten_shared::storage;
 pub enum View {
     Login(login::Login),
     Register(register::Register),
-    LoggedIn(logged_in::LoggedIn),
+    LoggedIn(zettel::Zettel),
 }
 
 impl From<login::Login> for View {
@@ -23,8 +23,8 @@ impl From<login::Login> for View {
     }
 }
 
-impl From<logged_in::LoggedIn> for View {
-    fn from(v: logged_in::LoggedIn) -> Self {
+impl From<zettel::Zettel> for View {
+    fn from(v: zettel::Zettel) -> Self {
         Self::LoggedIn(v)
     }
 }
@@ -54,11 +54,11 @@ impl View {
     pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> Result<Option<View>> {
         let next = match self {
             Self::LoggedIn(li) => match li.render(tui)? {
-                Some(logged_in::Transition::Exit) => {
+                Some(zettel::Transition::Exit) => {
                     tui.running = false;
                     return Ok(None);
                 }
-                Some(logged_in::Transition::Logout) => Some(Self::Login(Default::default())),
+                Some(zettel::Transition::Logout) => Some(Self::Login(Default::default())),
                 None => None,
             },
             Self::Login(login) => match login.render(tui)? {
@@ -99,6 +99,10 @@ pub enum ViewError {
     Event { source: std::io::Error },
     #[snafu(display("Database error"))]
     Database { source: storage::Error },
+    #[snafu(display("Zettel ID {id} not found"))]
+    ZettelIdNotFound { id: i64 },
+    #[snafu(display("Not implemented"))]
+    NotImplemented,
 }
 
 pub fn alert<F>(terminal: &mut super::Terminal, cb: F) -> Result<KeyCode>
@@ -125,7 +129,7 @@ where
                             actions += ", ";
                         }
                         match key {
-                            KeyCode::Char(c) => actions.push(*c),
+                            KeyCode::Char(c) => actions.push(c.to_ascii_uppercase()),
                             KeyCode::Enter => actions += "<enter>",
                             _ => unreachable!(),
                         }

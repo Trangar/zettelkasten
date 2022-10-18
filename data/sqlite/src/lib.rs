@@ -119,6 +119,23 @@ impl storage::Storage for Connection {
     ) -> Result<(), storage::Error> {
         todo!()
     }
+
+    async fn set_user_last_visited_zettel(
+        &self,
+        user: storage::UserId,
+        zettel_id: Option<storage::ZettelId>,
+    ) -> Result<(), storage::Error> {
+        let query = sqlx::query!(
+            "UPDATE users SET last_visited_zettel = ? WHERE user_id = ?",
+            zettel_id,
+            user
+        );
+        query
+            .execute(&mut *self.conn.lock().await)
+            .await
+            .context(storage::SqlxSnafu)?;
+        Ok(())
+    }
 }
 
 impl storage::ConnectableStorage for Connection {

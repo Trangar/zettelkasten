@@ -19,6 +19,11 @@ pub trait Storage: Send + Sync {
     async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Zettel, Error>;
     async fn get_zettel_by_url(&self, user: UserId, url: &str) -> Result<Option<Zettel>, Error>;
     async fn update_zettel(&self, user: UserId, zettel: &Zettel) -> Result<(), Error>;
+    async fn set_user_last_visited_zettel(
+        &self,
+        user: UserId,
+        zettel_id: Option<ZettelId>,
+    ) -> Result<(), Error>;
 }
 
 pub trait ConnectableStorage: Storage + Sized {
@@ -46,7 +51,7 @@ pub struct ZettelHeader {
     pub highlight_text: Option<String>,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Default)]
 pub struct Zettel {
     pub id: ZettelId,
     pub url: String,
