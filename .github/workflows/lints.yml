@@ -1,0 +1,63 @@
+on: [push]
+
+name: Lint & clippy
+
+jobs:
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runtime: [async-std]
+        front: [terminal]
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: clippy
+
+      - name: Install sqlx
+        uses: baptiste0928/cargo-install@v1
+        with:
+          crate: sqlx-cli
+          version: 0.6
+          features: sqlite,rustls
+          args: --no-default-features
+
+      - name: Setup database
+        run: |
+          echo "DATABASE_URL=sqlite://database.db" >> .env
+          sqlx database setup --source data/sqlite/migrations
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --features runtime-${{ matrix.runtime }},data-sqlite,front-${{ matrix.front }} -- -D warnings

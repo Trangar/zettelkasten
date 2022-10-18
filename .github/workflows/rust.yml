@@ -1,0 +1,40 @@
+on: [push]
+
+name: build
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        runtime: [async-std]
+        front: [terminal]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest stable
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+
+      - name: Install sqlx
+        uses: baptiste0928/cargo-install@v1
+        with:
+          crate: sqlx-cli
+          version: 0.6
+          features: sqlite,rustls
+          args: --no-default-features
+
+      - name: Setup database
+        run: |
+          echo "DATABASE_URL=sqlite://database.db" >> .env
+          sqlx database setup --source data/sqlite/migrations
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features runtime-${{ matrix.runtime }},data-sqlite,front-${{ matrix.front }}
