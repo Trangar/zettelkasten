@@ -1,0 +1,51 @@
+on: [push]
+
+name: build
+
+jobs:
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runtime: [async-std]
+        front: [terminal]
+        data: [sqlite]
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: clippy
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --features runtime-${{ matrix.runtime }},data-${{ matrix.data }},front-${{ matrix.front }} -- -D warnings

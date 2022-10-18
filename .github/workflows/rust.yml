@@ -1,0 +1,27 @@
+on: [push]
+
+name: build
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        runtime: [async-std]
+        front: [terminal]
+        data: [sqlite]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install latest stable
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features runtime-${{ matrix.runtime }},data-${{ matrix.data }},front-${{ matrix.front }}
