@@ -22,7 +22,7 @@ jobs:
 
       - name: Setup database
         run: |
-          cargo install --version=0.6.2 sqlx-cli --no-default-features --features sqlite
+          cargo install --version=0.6.2 sqlx-cli --no-default-features --features sqlite,rustls
           echo "DATABASE_URL=sqlite://database.db" >> .env
           sqlx database setup --source data/sqlite/migrations
 
