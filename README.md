@@ -1,21 +1,53 @@
 # zettelkasten
 Rust implementation of https://en.wikipedia.org/wiki/Zettelkasten
 
-## Trangar ideas
+## Configuration
 
-- Able to self-host this.
-- Multiple users but registering new accounts can be disabled
-- Web interface (maybe more)
-  - hotkey based
-    - `N` new zettel
-    - `E` edit current zettel
-    - `S` search in all zettels
-    - `F` highlight all links with unique 1-2 character codes. If you type those codes you'll follow the links
-    - `?` popup hotkeys
-  - Edit zettel is a split zettel
-    - Left is a text input
-    - Right is a markdown preview
-  - Links in zettels `[Zettel]` will auto-link to other zettels, if they don't exist a red link will be shown
-  - Going 1 zettel back will actually go a zettel back (properly push browser history)
-  - Ability to upload images with drag+drop or ctrl+V
-- Database backed (postgres/sqlite)
+Zettelkasten is build up out of the following modules:
+- `runtime`, what runtime is being used?
+- `data`, how is the data stored?
+- `front`, one or multiple frontends
+
+The following confirmations are available:
+
+|`runtime`  |`data`  |`front`   |
+|-----------|--------|----------|
+|`async-std`|`sqlite`|`terminal`|
+|           |        |`web`     |
+
+Note that these modules can be mixed and matched in any way you want.
+
+To run a particular combination, pass the set you want as feature flags. e.g.:
+```sh
+# runtime: async-std
+# data: sqlite
+# front: terminal
+cargo run --features runtime-async-std,data-sqlite,front-terminal
+```
+
+Additionally you can use [just](https://github.com/casey/just):
+```sh
+cargo install just
+```
+
+And then run one of:
+
+|`command`          |`runtime`  |`data`  |`front`   |
+|-------------------|-----------|--------|----------|
+|`just run_terminal`|`async-std`|`sqlite`|`terminal`|
+
+## Setup
+
+Some configs require custom setup instructions
+
+### `data-sqlite`
+
+To use a sqlite database you need to:
+- add `DATABASE_URL=sqlite://<path>` to `.env`
+  - example: `DATABASE_URL=sqlite://database.db`
+- either:
+  - with [sqlx-cli](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#sqlx-cli):
+    - install `cargo install sqlx-cli --no-default-features --features sqlite,rustls`
+    - run `sqlx database setup --source data/sqlite/migrations`
+  - manually:
+    - create a database file and run all the queries in `data/sqlite/migrations/*.up.sql`
