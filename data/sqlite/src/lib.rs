@@ -109,6 +109,7 @@ impl storage::Storage for Connection {
         user: storage::UserId,
         url: &str,
     ) -> Result<Option<storage::Zettel>, storage::Error> {
+        dbg!(url);
         todo!()
     }
 

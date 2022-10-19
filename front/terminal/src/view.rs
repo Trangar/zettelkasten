@@ -1,3 +1,4 @@
+mod config;
 mod login;
 mod register;
 mod zettel;
@@ -12,9 +13,10 @@ use tui::{
 use zettelkasten_shared::storage;
 
 pub enum View {
+    Config(config::Config),
     Login(login::Login),
     Register(register::Register),
-    LoggedIn(zettel::Zettel),
+    Zettel(zettel::Zettel),
 }
 
 impl From<login::Login> for View {
@@ -25,7 +27,12 @@ impl From<login::Login> for View {
 
 impl From<zettel::Zettel> for View {
     fn from(v: zettel::Zettel) -> Self {
-        Self::LoggedIn(v)
+        Self::Zettel(v)
+    }
+}
+impl From<config::Config> for View {
+    fn from(v: config::Config) -> Self {
+        Self::Config(v)
     }
 }
 
@@ -35,7 +42,7 @@ impl View {
             storage::UserMode::SingleUserAutoLogin => {
                 match zettelkasten_shared::block_on(storage.login_single_user()) {
                     // Successfully logged in
-                    Ok(user) => Self::LoggedIn(user.into()),
+                    Ok(user) => Self::Zettel(user.into()),
                     // Failed to log in, show the login view and the error
                     Err(source) => login::Login {
                         error: Some(login::LoginError::Storage { source }),
@@ -53,10 +60,37 @@ impl View {
 
     pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> Result<Option<View>> {
         let next = match self {
-            Self::LoggedIn(li) => match li.render(tui)? {
+            Self::Zettel(li) => match li.render(tui)? {
                 Some(zettel::Transition::Exit) => {
                     tui.running = false;
-                    return Ok(None);
+                    None
+                }
+                Some(zettel::Transition::NavigateTo { path }) => {
+                    if path.starts_with("sys:") {
+                        if path == "sys:config" {
+                            Some(config::Config::new(Some(Self::Zettel(li.clone())), tui).into())
+                        } else {
+                            alert(&mut tui.terminal, |f| {
+                                f.title("Reserved sys page")
+                                    .text(format!("`sys:` is a reserved prefix, could not navigate to {path:?}"))
+                                    .action(KeyCode::Char('c'), "continue")
+                            })
+                            .expect("Double fault, time to crash to desktop");
+                            None
+                        }
+                    } else {
+                        let zettel = zettelkasten_shared::block_on(
+                            tui.storage.get_zettel_by_url(li.user.id, &path),
+                        )
+                        .context(DatabaseSnafu)?;
+                        Some(
+                            zettel::Zettel {
+                                user: li.user.clone(),
+                                zettel: Some(zettel.unwrap_or_default()),
+                            }
+                            .into(),
+                        )
+                    }
                 }
                 Some(zettel::Transition::Logout) => Some(Self::Login(Default::default())),
                 None => None,
@@ -67,7 +101,7 @@ impl View {
                     None
                 }
                 Some(login::Transition::Register) => Some(Self::Register(Default::default())),
-                Some(login::Transition::Login { user }) => Some(Self::LoggedIn(user.into())),
+                Some(login::Transition::Login { user }) => Some(Self::Zettel(user.into())),
                 None => None,
             },
             Self::Register(reg) => match reg.render(tui)? {
@@ -75,13 +109,16 @@ impl View {
                     tui.running = false;
                     None
                 }
-                Some(register::Transition::Registered { user }) => {
-                    Some(Self::LoggedIn(user.into()))
-                }
+                Some(register::Transition::Registered { user }) => Some(Self::Zettel(user.into())),
                 Some(register::Transition::Login) => Some(Self::Login(Default::default())),
                 None => None,
             },
+            Self::Config(config) => match config.render(tui)? {
+                Some(config::Transition::Pop) => config.parent_page.take().map(|b| *b),
+                None => None,
+            },
         };
+
         Ok(next)
     }
 }

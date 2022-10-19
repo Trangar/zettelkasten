@@ -22,10 +22,6 @@ zettelkasten-sqlite = { path = "data/sqlite", optional = true }
 zettelkasten-shared = { path = "shared" }
 dotenv = { version = "0.15.0", default-features = false }
 
-# Thiserror >=1.0.35 has issues with rust-analyzer, messing with people's editor settings
-# For more info see https://github.com/dtolnay/thiserror/issues/192#issuecomment-1279991075
-thiserror = "=1.0.34"
-
 [dependencies.async-std]
 version = "1.12.0"
 default-features = false

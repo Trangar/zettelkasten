@@ -1,6 +1,6 @@
 use crate::async_trait;
 use futures::future::LocalBoxFuture;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 pub type ZettelId = i64;
 pub type UserId = i64;
@@ -33,7 +33,7 @@ pub trait ConnectableStorage: Storage + Sized {
     ) -> LocalBoxFuture<'a, Result<(Self, SystemConfig), Error>>;
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone)]
 pub struct User {
     pub id: UserId,
     pub name: String,
@@ -51,13 +51,13 @@ pub struct ZettelHeader {
     pub highlight_text: Option<String>,
 }
 
-#[derive(sqlx::FromRow, Default)]
+#[derive(sqlx::FromRow, Default, Clone)]
 pub struct Zettel {
     pub id: ZettelId,
     pub url: String,
     pub title: String,
     pub body: String,
-    pub attachments: Vec<Box<dyn Attachment>>,
+    pub attachments: Vec<Arc<dyn Attachment>>,
 }
 
 #[async_trait]
