@@ -16,4 +16,4 @@ zettelkasten-shared = { version = "0.0.0", path = "../../shared" }
 [dependencies.sqlx]
 version = "0.6.2"
 default-features = false
-features = ["sqlite", "migrate", "macros", "json"]
+features = ["sqlite", "migrate", "macros", "json", "chrono"]

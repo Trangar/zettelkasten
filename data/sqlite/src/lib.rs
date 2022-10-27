@@ -107,10 +107,30 @@ impl storage::Storage for Connection {
     async fn get_zettel_by_url(
         &self,
         user: storage::UserId,
-        url: &str,
+        path: &str,
     ) -> Result<Option<storage::Zettel>, storage::Error> {
-        dbg!(url);
-        todo!()
+        let mut conn = self.conn.lock().await;
+        let conn = &mut *conn;
+        let result = match sqlx::query!(
+            "SELECT zettel_id, path, title, body FROM zettel WHERE user_id = ? AND path = ?",
+            user,
+            path
+        )
+        .fetch_optional(conn)
+        .await
+        .context(storage::SqlxSnafu)?
+        {
+            Some(zettel) => zettel,
+            None => return Ok(None),
+        };
+
+        Ok(Some(storage::Zettel {
+            id: result.zettel_id,
+            url: result.path,
+            title: result.title,
+            body: result.body,
+            attachments: Vec::new(),
+        }))
     }
 
     async fn update_zettel(

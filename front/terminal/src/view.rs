@@ -1,6 +1,7 @@
 mod config;
 mod login;
 mod register;
+mod utils;
 mod zettel;
 
 use crossterm::event::{Event, KeyCode};
