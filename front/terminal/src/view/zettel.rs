@@ -64,14 +64,14 @@ impl Zettel {
     }
 
     pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> super::Result<Option<Transition>> {
-        let zettel = self.load_zettel(tui)?;
+        let current_zettel = self.load_zettel(tui)?;
         let mut render_link_input: Option<String> = None;
         let mut rendered_zettel = None;
         loop {
-            let title = &zettel.title;
+            let title = &current_zettel.title;
             let zettel = rendered_zettel.get_or_insert_with(|| {
                 ParsedZettel::parse(
-                    zettel,
+                    current_zettel,
                     DISALLOWED_CHARS,
                     render_link_input.is_some(),
                     Default::default(),
@@ -114,7 +114,7 @@ impl Zettel {
             if let Event::Key(key_event) = event {
                 match key_event.code {
                     KeyCode::Char('q') => return Ok(Some(Transition::Exit)),
-                    KeyCode::Char('e') => return Err(super::ViewError::NotImplemented),
+                    KeyCode::Char('e') => return Ok(Some(Transition::Edit)),
                     KeyCode::Char('c') => return Ok(Some(Transition::OpenConfig)),
                     KeyCode::Char('f') => {
                         if render_link_input.is_some() {
@@ -152,10 +152,12 @@ impl Zettel {
         }
     }
 }
+
 #[allow(dead_code)]
 pub enum Transition {
     Exit,
     Logout,
     NavigateTo { path: String },
     OpenConfig,
+    Edit,
 }

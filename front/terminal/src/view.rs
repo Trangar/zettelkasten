@@ -6,7 +6,11 @@ mod zettel;
 
 use crossterm::event::{Event, KeyCode};
 use snafu::{ResultExt, Snafu};
-use std::{borrow::Cow, sync::Arc};
+use std::{
+    borrow::Cow,
+    io::{Read, Write},
+    sync::Arc,
+};
 use tui::{
     text::{Spans, Text},
     widgets::{Block, Borders, Paragraph},
@@ -67,18 +71,8 @@ impl View {
                     None
                 }
                 Some(zettel::Transition::NavigateTo { path }) => {
-                    if path.starts_with("sys:") {
-                        if path == "sys:config" {
-                            Some(config::Config::new(Some(Self::Zettel(li.clone())), tui).into())
-                        } else {
-                            alert(tui.terminal, |f| {
-                                f.title("Reserved sys page")
-                                    .text(format!("`sys:` is a reserved prefix, could not navigate to {path:?}"))
-                                    .action(KeyCode::Char('c'), "continue")
-                            })
-                            .expect("Double fault, time to crash to desktop");
-                            None
-                        }
+                    if let Some(sys_path) = path.strip_prefix("sys:") {
+                        open_sys_page(sys_path, li, tui)
                     } else {
                         let zettel = zettelkasten_shared::block_on(
                             tui.storage.get_zettel_by_url(li.user.id, &path),
@@ -97,6 +91,18 @@ impl View {
                 Some(zettel::Transition::OpenConfig) => {
                     Some(config::Config::new(Some(Self::Zettel(li.clone())), tui).into())
                 }
+                Some(zettel::Transition::Edit) => {
+                    let zettel = li.zettel.as_mut().unwrap();
+                    if let Some(new_body) = edit(zettel, tui)? {
+                        zettel.body = new_body;
+                        zettelkasten_shared::block_on(
+                            tui.storage.update_zettel(li.user.id, zettel),
+                        )
+                        .context(DatabaseSnafu)?;
+                    }
+                    None
+                }
+
                 None => None,
             },
             Self::Login(login) => match login.render(tui)? {
@@ -127,23 +133,76 @@ impl View {
     }
 }
 
+fn open_sys_page(path: &str, li: &zettel::Zettel, tui: &mut crate::Tui) -> Option<View> {
+    if path == "config" {
+        Some(config::Config::new(Some(View::Zettel(li.clone())), tui).into())
+    } else {
+        alert(tui.terminal, |f| {
+            f.title("Reserved sys page")
+                .text(format!(
+                    "`sys:` is a reserved prefix, could not navigate to `sys:{path:?}`"
+                ))
+                .action(KeyCode::Char('c'), "continue")
+        })
+        .expect("Double fault, time to crash to desktop");
+        None
+    }
+}
+
+fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> Result<Option<String>> {
+    let editor = if let Some(editor) = &tui.system_config.terminal_editor {
+        editor
+    } else {
+        alert(tui.terminal, |cb| {
+            cb.title("Could not edit zettel")
+                .text("No terminal editor configured")
+                .text("Please set one up in sys:config")
+        })?;
+        return Ok(None);
+    };
+    let mut tmp_file = tempfile::NamedTempFile::new().context(IoSnafu)?;
+    tmp_file
+        .write_all(zettel.body.as_bytes())
+        .context(IoSnafu)?;
+    let _status = std::process::Command::new(editor)
+        .arg(tmp_file.path())
+        .status()
+        .context(IoSnafu)?;
+    let mut result = String::new();
+    tmp_file.read_to_string(&mut result).context(IoSnafu)?;
+    Ok(Some(result))
+}
+
 pub type Result<T = ()> = std::result::Result<T, ViewError>;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum ViewError {
     #[snafu(display("Could not retrieve the terminal size"))]
-    TerminalSize { source: std::io::Error },
+    TerminalSize {
+        source: std::io::Error,
+    },
     #[snafu(display("Could not render a frame"))]
-    RenderFrame { source: std::io::Error },
+    RenderFrame {
+        source: std::io::Error,
+    },
     #[snafu(display("Could not get the next terminal event"))]
-    Event { source: std::io::Error },
+    Event {
+        source: std::io::Error,
+    },
     #[snafu(display("Database error"))]
-    Database { source: storage::Error },
+    Database {
+        source: storage::Error,
+    },
     #[snafu(display("Zettel ID {id} not found"))]
-    ZettelIdNotFound { id: i64 },
+    ZettelIdNotFound {
+        id: i64,
+    },
     #[snafu(display("Not implemented"))]
     NotImplemented,
+    Io {
+        source: std::io::Error,
+    },
 }
 
 pub fn alert<F>(terminal: &mut super::Terminal, cb: F) -> Result<KeyCode>
