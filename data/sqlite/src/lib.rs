@@ -107,9 +107,30 @@ impl storage::Storage for Connection {
     async fn get_zettel_by_url(
         &self,
         user: storage::UserId,
-        url: &str,
+        path: &str,
     ) -> Result<Option<storage::Zettel>, storage::Error> {
-        todo!()
+        let mut conn = self.conn.lock().await;
+        let conn = &mut *conn;
+        let result = match sqlx::query!(
+            "SELECT zettel_id, path, title, body FROM zettel WHERE user_id = ? AND path = ?",
+            user,
+            path
+        )
+        .fetch_optional(conn)
+        .await
+        .context(storage::SqlxSnafu)?
+        {
+            Some(zettel) => zettel,
+            None => return Ok(None),
+        };
+
+        Ok(Some(storage::Zettel {
+            id: result.zettel_id,
+            url: result.path,
+            title: result.title,
+            body: result.body,
+            attachments: Vec::new(),
+        }))
     }
 
     async fn update_zettel(
@@ -118,6 +139,23 @@ impl storage::Storage for Connection {
         zettel: &storage::Zettel,
     ) -> Result<(), storage::Error> {
         todo!()
+    }
+
+    async fn set_user_last_visited_zettel(
+        &self,
+        user: storage::UserId,
+        zettel_id: Option<storage::ZettelId>,
+    ) -> Result<(), storage::Error> {
+        let query = sqlx::query!(
+            "UPDATE users SET last_visited_zettel = ? WHERE user_id = ?",
+            zettel_id,
+            user
+        );
+        query
+            .execute(&mut *self.conn.lock().await)
+            .await
+            .context(storage::SqlxSnafu)?;
+        Ok(())
     }
 }
 

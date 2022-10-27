@@ -1,6 +1,6 @@
 use crate::async_trait;
 use futures::future::LocalBoxFuture;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 pub type ZettelId = i64;
 pub type UserId = i64;
@@ -19,6 +19,11 @@ pub trait Storage: Send + Sync {
     async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Zettel, Error>;
     async fn get_zettel_by_url(&self, user: UserId, url: &str) -> Result<Option<Zettel>, Error>;
     async fn update_zettel(&self, user: UserId, zettel: &Zettel) -> Result<(), Error>;
+    async fn set_user_last_visited_zettel(
+        &self,
+        user: UserId,
+        zettel_id: Option<ZettelId>,
+    ) -> Result<(), Error>;
 }
 
 pub trait ConnectableStorage: Storage + Sized {
@@ -28,7 +33,7 @@ pub trait ConnectableStorage: Storage + Sized {
     ) -> LocalBoxFuture<'a, Result<(Self, SystemConfig), Error>>;
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone)]
 pub struct User {
     pub id: UserId,
     pub name: String,
@@ -46,13 +51,13 @@ pub struct ZettelHeader {
     pub highlight_text: Option<String>,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Default, Clone)]
 pub struct Zettel {
     pub id: ZettelId,
     pub url: String,
     pub title: String,
     pub body: String,
-    pub attachments: Vec<Box<dyn Attachment>>,
+    pub attachments: Vec<Arc<dyn Attachment>>,
 }
 
 #[async_trait]
