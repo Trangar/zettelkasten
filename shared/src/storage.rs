@@ -55,8 +55,7 @@ pub struct ZettelHeader {
 #[derive(sqlx::FromRow, Default, Clone)]
 pub struct Zettel {
     pub id: ZettelId,
-    pub url: String,
-    pub title: String,
+    pub path: String,
     pub body: String,
     pub attachments: Vec<Arc<dyn Attachment>>,
 }

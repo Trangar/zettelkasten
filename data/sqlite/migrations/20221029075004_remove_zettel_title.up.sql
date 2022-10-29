@@ -1,0 +1,1 @@
+ALTER TABLE zettel DROP COLUMN title;

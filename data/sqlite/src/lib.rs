@@ -118,7 +118,7 @@ impl storage::Storage for Connection {
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
         let result = match sqlx::query!(
-            "SELECT zettel_id, path, title, body FROM zettel WHERE user_id = ? AND path = ?",
+            "SELECT zettel_id, path, body FROM zettel WHERE user_id = ? AND path = ?",
             user,
             path
         )
@@ -132,8 +132,7 @@ impl storage::Storage for Connection {
 
         Ok(Some(storage::Zettel {
             id: result.zettel_id,
-            url: result.path,
-            title: result.title,
+            path: result.path,
             body: result.body,
             attachments: Vec::new(),
         }))

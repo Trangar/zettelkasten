@@ -68,7 +68,7 @@ impl Zettel {
         let mut render_link_input: Option<String> = None;
         let mut rendered_zettel = None;
         loop {
-            let title = &current_zettel.title;
+            let title = &current_zettel.path;
             let zettel = rendered_zettel.get_or_insert_with(|| {
                 ParsedZettel::parse(
                     current_zettel,
