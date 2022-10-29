@@ -47,7 +47,7 @@ impl<'a> ParsedZettel<'a> {
         let mut lines = Vec::new();
         let mut links = HashMap::new();
 
-        let allowed_chars = ('a'..'z')
+        let allowed_chars = ('a'..='z')
             .filter(|c| !disallowed.contains(c))
             .collect::<Vec<_>>();
         let matches = LINK_REGEX.find_iter(&zettel.body).count();
@@ -86,7 +86,7 @@ impl<'a> ParsedZettel<'a> {
                 } else {
                     parts.push(Span::styled(&line[text.range()], style.link_style));
                 }
-                let end = maybe_link.map(|l| l.end()).unwrap_or(text.end());
+                let end = maybe_link.map(|l| l.end()).unwrap_or_else(|| text.end());
                 line = &line[end..];
 
                 let url = if let Some(url) = maybe_link {
