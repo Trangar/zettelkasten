@@ -102,7 +102,7 @@ impl Register {
                     KeyCode::Enter => match self.cursor {
                         Cursor::Username => self.cursor = Cursor::Password,
                         Cursor::Password => self.cursor = Cursor::RepeatPassword,
-                        Cursor::RepeatPassword => match self.try_register(&tui.storage) {
+                        Cursor::RepeatPassword => match self.try_register(tui.storage) {
                             Ok(v) => return Ok(v),
                             Err(e) => {
                                 self.error = Some(e);

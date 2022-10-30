@@ -71,7 +71,7 @@ impl View {
                         if path == "sys:config" {
                             Some(config::Config::new(Some(Self::Zettel(li.clone())), tui).into())
                         } else {
-                            alert(&mut tui.terminal, |f| {
+                            alert(tui.terminal, |f| {
                                 f.title("Reserved sys page")
                                     .text(format!("`sys:` is a reserved prefix, could not navigate to {path:?}"))
                                     .action(KeyCode::Char('c'), "continue")
@@ -94,6 +94,9 @@ impl View {
                     }
                 }
                 Some(zettel::Transition::Logout) => Some(Self::Login(Default::default())),
+                Some(zettel::Transition::OpenConfig) => {
+                    Some(config::Config::new(Some(Self::Zettel(li.clone())), tui).into())
+                }
                 None => None,
             },
             Self::Login(login) => match login.render(tui)? {

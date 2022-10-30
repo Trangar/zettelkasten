@@ -24,6 +24,7 @@ pub trait Storage: Send + Sync {
         user: UserId,
         zettel_id: Option<ZettelId>,
     ) -> Result<(), Error>;
+    async fn update_config(&self, config: &SystemConfig) -> Result<(), Error>;
 }
 
 pub trait ConnectableStorage: Storage + Sized {
@@ -70,7 +71,7 @@ pub trait Attachment: Send + Sync {
 #[snafu(visibility(pub))]
 pub enum Error {
     Bcrypt { source: bcrypt::BcryptError },
-    JsonDeserializeError { source: serde_json::Error },
+    Json { source: serde_json::Error },
     Sqlx { source: sqlx::Error },
     SqlxMigrate { source: sqlx::migrate::MigrateError },
 

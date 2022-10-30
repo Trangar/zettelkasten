@@ -115,7 +115,7 @@ impl Zettel {
                 match key_event.code {
                     KeyCode::Char('q') => return Ok(Some(Transition::Exit)),
                     KeyCode::Char('e') => return Err(super::ViewError::NotImplemented),
-                    KeyCode::Char('c') => return Err(super::ViewError::NotImplemented),
+                    KeyCode::Char('c') => return Ok(Some(Transition::OpenConfig)),
                     KeyCode::Char('f') => {
                         if render_link_input.is_some() {
                             render_link_input = None;
@@ -157,4 +157,5 @@ pub enum Transition {
     Exit,
     Logout,
     NavigateTo { path: String },
+    OpenConfig,
 }
