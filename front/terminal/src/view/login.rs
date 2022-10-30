@@ -24,7 +24,7 @@ pub enum Cursor {
 
 #[derive(Debug, Snafu)]
 pub enum LoginError {
-    #[snafu(display("Storage error"))]
+    #[snafu(display("Storage error: {source:?}"))]
     Storage { source: storage::Error },
     #[snafu(display("Login failed"))]
     LoginFailed,
@@ -87,7 +87,7 @@ impl Login {
                     KeyCode::Tab if can_register => return Ok(Some(Transition::Register)),
                     KeyCode::Enter => match self.cursor {
                         Cursor::Username => self.cursor = Cursor::Password,
-                        Cursor::Password => match self.try_login(&tui.storage) {
+                        Cursor::Password => match self.try_login(tui.storage) {
                             Ok(v) => return Ok(v),
                             Err(e) => {
                                 self.error = Some(e);

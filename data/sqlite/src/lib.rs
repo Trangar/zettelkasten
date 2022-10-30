@@ -24,8 +24,14 @@ impl storage::Storage for Connection {
     }
 
     async fn login_single_user(&self) -> Result<storage::User, storage::Error> {
-        let maybe_user = self.login("root", "").await?;
-        maybe_user.ok_or(storage::Error::SingleUserNotFound)
+        let query = sqlx::query_as!(
+            storage::User,
+            "SELECT user_id as id, username as name, password, last_visited_zettel FROM users",
+        );
+        query
+            .fetch_one(&mut *self.conn.lock().await)
+            .await
+            .context(storage::SqlxSnafu)
     }
 
     async fn login(
@@ -157,6 +163,45 @@ impl storage::Storage for Connection {
             .context(storage::SqlxSnafu)?;
         Ok(())
     }
+
+    async fn update_config(&self, config: &storage::SystemConfig) -> Result<(), storage::Error> {
+        let values = if let serde_json::Value::Object(map) =
+            serde_json::to_value(config).context(storage::JsonSnafu)?
+        {
+            map
+        } else {
+            panic!("SystemConfig did not serialize to an object")
+        };
+
+        let mut conn = self.conn.lock().await;
+        for (key, value) in values {
+            sqlx::query!("UPDATE config SET value = ? WHERE key = ?", value, key)
+                .execute(&mut *conn)
+                .await
+                .context(storage::SqlxSnafu)?;
+        }
+        Ok(())
+    }
+}
+
+impl Connection {
+    async fn load_config(&self) -> Result<storage::SystemConfig, storage::Error> {
+        // load all the key-value entries from the database
+        let result = sqlx::query!("SELECT key, value FROM config")
+            .fetch_all(&mut *self.conn.lock().await)
+            .await
+            .context(storage::SqlxSnafu)?;
+
+        // Map them into a `serde_json::Map`
+        let map: serde_json::Map<String, serde_json::Value> = result
+            .into_iter()
+            .map(|o| Ok((o.key, serde_json::from_str(&o.value)?)))
+            .collect::<Result<_, _>>()
+            .context(storage::JsonSnafu)?;
+
+        // Now we can deserialize this from a `serde_json::Value::Object(map)`
+        serde_json::from_value(serde_json::Value::Object(map)).context(storage::JsonSnafu)
+    }
 }
 
 impl storage::ConnectableStorage for Connection {
@@ -187,26 +232,5 @@ impl storage::ConnectableStorage for Connection {
             Ok((connection, config))
         }
         .boxed_local()
-    }
-}
-
-impl Connection {
-    async fn load_config(&self) -> Result<storage::SystemConfig, storage::Error> {
-        // load all the key-value entries from the database
-        let result = sqlx::query!("SELECT key, value FROM config")
-            .fetch_all(&mut *self.conn.lock().await)
-            .await
-            .context(storage::SqlxSnafu)?;
-
-        // Map them into a `serde_json::Map`
-        let map: serde_json::Map<String, serde_json::Value> = result
-            .into_iter()
-            .map(|o| Ok((o.key, serde_json::from_str(&o.value)?)))
-            .collect::<Result<_, _>>()
-            .context(storage::JsonDeserializeSnafu)?;
-
-        // Now we can deserialize this from a `serde_json::Value::Object(map)`
-        serde_json::from_value(serde_json::Value::Object(map))
-            .context(storage::JsonDeserializeSnafu)
     }
 }
