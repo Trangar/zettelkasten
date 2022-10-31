@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use tui::{
     style::{Color, Style},
     text::{Span, Spans},
@@ -14,7 +13,7 @@ lazy_static::lazy_static! {
     /// but not:
     /// - `[asd]
     /// - `[asd](dsa)
-    static ref LINK_REGEX: regex::Regex = regex::Regex::new(r#"[^`](\[[^\]]+\])(?:\(([^)]+)\))?"#).unwrap();
+    static ref LINK_REGEX: regex::Regex = regex::Regex::new(r#"(?:^|[^`])(\[[^\]]+\])(\([^)]+\))?"#).unwrap();
 }
 
 pub struct RenderStyle {
@@ -90,9 +89,9 @@ impl<'a> ParsedZettel<'a> {
                 line = &line[end..];
 
                 let url = if let Some(url) = maybe_link {
-                    url.as_str()
+                    url.as_str().trim_start_matches('(').trim_end_matches(')')
                 } else {
-                    text.as_str()
+                    text.as_str().trim_start_matches('[').trim_end_matches(']')
                 };
                 links.insert(char, url);
             }
