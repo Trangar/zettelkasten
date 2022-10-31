@@ -78,10 +78,25 @@ impl View {
                             tui.storage.get_zettel_by_url(li.user.id, &path),
                         )
                         .context(DatabaseSnafu)?;
+
+                        let zettel = if let Some(zettel) = zettel {
+                            zettelkasten_shared::block_on(
+                                tui.storage
+                                    .set_user_last_visited_zettel(li.user.id, Some(zettel.id)),
+                            )
+                            .context(DatabaseSnafu)?;
+                            zettel
+                        } else {
+                            storage::Zettel {
+                                path,
+                                ..Default::default()
+                            }
+                        };
+
                         Some(
                             zettel::Zettel {
                                 user: li.user.clone(),
-                                zettel: Some(zettel.unwrap_or_default()),
+                                zettel: Some(zettel),
                             }
                             .into(),
                         )
@@ -195,7 +210,7 @@ pub enum ViewError {
     Event {
         source: std::io::Error,
     },
-    #[snafu(display("Database error"))]
+    #[snafu(display("Database error: {source:?}"))]
     Database {
         source: storage::Error,
     },

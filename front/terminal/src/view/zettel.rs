@@ -57,6 +57,7 @@ impl Zettel {
             }
         } else {
             Ok(self.zettel.insert(storage::Zettel {
+                path: "home".to_string(),
                 body: ENTRY_TEXT.into(),
                 ..Default::default()
             }))
