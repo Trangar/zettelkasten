@@ -107,7 +107,23 @@ impl storage::Storage for Connection {
         user: storage::UserId,
         id: storage::ZettelId,
     ) -> Result<storage::Zettel, storage::Error> {
-        todo!()
+        let mut conn = self.conn.lock().await;
+        let conn = &mut *conn;
+        let result = sqlx::query!(
+            "SELECT zettel_id, path, body FROM zettel WHERE user_id = ? AND zettel_id = ?",
+            user,
+            id
+        )
+        .fetch_one(conn)
+        .await
+        .context(storage::SqlxSnafu)?;
+
+        Ok(storage::Zettel {
+            id: result.zettel_id,
+            path: result.path,
+            body: result.body,
+            attachments: Vec::new(),
+        })
     }
 
     async fn get_zettel_by_url(
@@ -141,9 +157,50 @@ impl storage::Storage for Connection {
     async fn update_zettel(
         &self,
         user: storage::UserId,
-        zettel: &storage::Zettel,
+        zettel: &mut storage::Zettel,
     ) -> Result<(), storage::Error> {
-        todo!()
+        let mut conn = self.conn.lock().await;
+        if zettel.id == 0 {
+            let query = sqlx::query!(
+                r#"INSERT INTO zettel
+                (user_id, path, body, title, created_on, last_modified_on)
+                VALUES
+                (?, ?, ?, '', datetime(), datetime())
+                "#,
+                user,
+                zettel.path,
+                zettel.body,
+            );
+            let id = query
+                .execute(&mut *conn)
+                .await
+                .context(storage::SqlxSnafu)?
+                .last_insert_rowid();
+            zettel.id = id;
+            sqlx::query!(
+                "UPDATE users SET last_visited_zettel = ? WHERE user_id = ?",
+                zettel.id,
+                user
+            )
+            .execute(&mut *conn)
+            .await
+            .context(storage::SqlxSnafu)?;
+
+            Ok(())
+        } else {
+            sqlx::query!(
+                r#"UPDATE zettel
+                SET path = ?, body = ?, last_modified_on = datetime()
+                WHERE zettel_id = ?"#,
+                zettel.path,
+                zettel.body,
+                zettel.id,
+            )
+            .execute(&mut *conn)
+            .await
+            .context(storage::SqlxSnafu)?;
+            Ok(())
+        }
     }
 
     async fn set_user_last_visited_zettel(
@@ -226,7 +283,6 @@ impl storage::ConnectableStorage for Connection {
             };
 
             let config = connection.load_config().await?;
-            dbg!(&config);
 
             Ok((connection, config))
         }

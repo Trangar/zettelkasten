@@ -18,7 +18,7 @@ pub trait Storage: Send + Sync {
     ) -> Result<Vec<ZettelHeader>, Error>;
     async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Zettel, Error>;
     async fn get_zettel_by_url(&self, user: UserId, url: &str) -> Result<Option<Zettel>, Error>;
-    async fn update_zettel(&self, user: UserId, zettel: &Zettel) -> Result<(), Error>;
+    async fn update_zettel(&self, user: UserId, zettel: &mut Zettel) -> Result<(), Error>;
     async fn set_user_last_visited_zettel(
         &self,
         user: UserId,
@@ -52,11 +52,12 @@ pub struct ZettelHeader {
     pub highlight_text: Option<String>,
 }
 
-#[derive(sqlx::FromRow, Default, Clone)]
+#[derive(sqlx::FromRow, Default, Clone, custom_debug::Debug)]
 pub struct Zettel {
     pub id: ZettelId,
     pub path: String,
     pub body: String,
+    #[debug(skip)]
     pub attachments: Vec<Arc<dyn Attachment>>,
 }
 

@@ -8,7 +8,7 @@ use crossterm::event::{Event, KeyCode};
 use snafu::{ResultExt, Snafu};
 use std::{
     borrow::Cow,
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     sync::Arc,
 };
 use tui::{
@@ -160,7 +160,10 @@ fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> Result<Option<String>
         })?;
         return Ok(None);
     };
-    let mut tmp_file = tempfile::NamedTempFile::new().context(IoSnafu)?;
+    let mut tmp_file = tempfile::Builder::new()
+        .suffix(".md")
+        .tempfile()
+        .context(IoSnafu)?;
     tmp_file
         .write_all(zettel.body.as_bytes())
         .context(IoSnafu)?;
@@ -168,6 +171,8 @@ fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> Result<Option<String>
         .arg(tmp_file.path())
         .status()
         .context(IoSnafu)?;
+
+    tmp_file.seek(SeekFrom::Start(0)).context(IoSnafu)?;
     let mut result = String::new();
     tmp_file.read_to_string(&mut result).context(IoSnafu)?;
     Ok(Some(result))
