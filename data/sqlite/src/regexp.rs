@@ -182,5 +182,5 @@ unsafe fn get_text_from_arg<'a>(
 
 /// Clean up the `Arc<Regex>` that is stored in the given `ptr`.
 unsafe extern "C" fn cleanup_arc_regex_pointer(ptr: *mut std::ffi::c_void) {
-    let _arc: Arc<Regex> = Arc::from_raw(ptr.cast());
+    Arc::decrement_strong_count(ptr.cast::<Regex>());
 }
