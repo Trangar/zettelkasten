@@ -1,6 +1,9 @@
 default:
     just --list
 
+docs_terminal:
+    cargo doc --features front-terminal,data-sqlite,runtime-async-std --open
+
 check_terminal:
     cargo check --features front-terminal,data-sqlite,runtime-async-std
 

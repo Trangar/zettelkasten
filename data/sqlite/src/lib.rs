@@ -1,3 +1,5 @@
+mod regexp;
+
 use async_lock::Mutex;
 use snafu::ResultExt;
 use sqlx::ConnectOptions as _;
@@ -278,6 +280,9 @@ impl storage::ConnectableStorage for Connection {
                 .run(&mut connection)
                 .await
                 .context(storage::SqlxMigrateSnafu)?;
+
+            regexp::register(&mut connection).await;
+
             let connection = Connection {
                 conn: Arc::new(Mutex::new(connection)),
             };
