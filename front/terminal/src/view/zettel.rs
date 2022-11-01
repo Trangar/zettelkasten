@@ -24,16 +24,17 @@ const ENTRY_TEXT: &str = r#"Welcome to Zettelkasten
 
 You can see the available controls at the bottom of the page. If you are an admin, make sure to check out the config page (`C`).
 
-- Q: Exit zettelkasten
-- E: Edit the current page
+- A: Show all paths
 - C: Open up the [system config](sys:config)
+- E: Edit the current page
 - F: Follow a link on the current page
   - Links are marked by `[name]` or `[name](path)` (only the `name` will be rendered)
-- S: Search in all zettels
 - L: Log out
+- Q: Exit zettelkasten
+- S: Search in all zettels
 "#;
 
-const DISALLOWED_CHARS: &[char] = &['q', 'e', 'c', 'f', 's', 'l'];
+const DISALLOWED_CHARS: &[char] = &['a', 'c', 'e', 'f', 'l', 'q', 's'];
 
 impl Zettel {
     fn load_zettel(&mut self, tui: &crate::Tui) -> super::Result<&storage::Zettel> {
@@ -114,9 +115,9 @@ impl Zettel {
             let event = crossterm::event::read().context(super::EventSnafu)?;
             if let Event::Key(key_event) = event {
                 match key_event.code {
-                    KeyCode::Char('q') => return Ok(Some(Transition::Exit)),
-                    KeyCode::Char('e') => return Ok(Some(Transition::Edit)),
+                    KeyCode::Char('a') => return Err(super::ViewError::NotImplemented),
                     KeyCode::Char('c') => return Ok(Some(Transition::OpenConfig)),
+                    KeyCode::Char('e') => return Ok(Some(Transition::Edit)),
                     KeyCode::Char('f') => {
                         if render_link_input.is_some() {
                             render_link_input = None;
@@ -126,8 +127,9 @@ impl Zettel {
                         rendered_zettel.take();
                         continue;
                     }
-                    KeyCode::Char('s') => return Err(super::ViewError::NotImplemented),
                     KeyCode::Char('l') => return Ok(Some(Transition::Logout)),
+                    KeyCode::Char('q') => return Ok(Some(Transition::Exit)),
+                    KeyCode::Char('s') => return Err(super::ViewError::NotImplemented),
                     _ => {}
                 }
 
