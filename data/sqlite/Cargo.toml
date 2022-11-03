@@ -4,7 +4,10 @@ version = "0.0.0"
 edition = "2021"
 
 [features]
-runtime-async-std = ["sqlx/runtime-async-std-rustls"]
+runtime-async-std = [
+    "sqlx/runtime-async-std-rustls",
+    "zettelkasten-shared/runtime-async-std",
+]
 
 [dependencies]
 async-lock = { version = "2.5.0", default-features = false }

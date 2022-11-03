@@ -89,7 +89,7 @@ impl Zettel {
 
             let action = Paragraph::new(Text {
                 lines: vec![
-                    "Q: exit, E: edit, C: config, F: follow link, S: search, L: log out".into(),
+                    "A: All pages, C: config, E: edit, F: follow link, L: log out, Q: exit, S: search".into(),
                 ],
             });
             tui.terminal
