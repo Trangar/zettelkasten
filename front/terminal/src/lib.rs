@@ -57,22 +57,18 @@ impl Front for Tui<'_> {
         };
 
         while tui.running {
-            match view.render(&mut tui) {
-                Ok(Some(next_state)) => view = next_state,
-                Ok(None) => {}
-                Err(e) => {
-                    let keycode = view::alert(tui.terminal, |f| {
-                        f.title("Could not render page")
-                            .text(e.to_string())
-                            .action(KeyCode::Char('q'), "quit")
-                            .action(KeyCode::Char('c'), "continue")
-                    })
-                    .expect("Double fault, time to crash to desktop");
-                    match keycode {
-                        KeyCode::Char('q') => return,
-                        KeyCode::Char('c') => {}
-                        _ => unreachable!(),
-                    }
+            if let Err(e) = view.render(&mut tui) {
+                let keycode = view::alert(tui.terminal, |f| {
+                    f.title("Could not render page")
+                        .text(e.to_string())
+                        .action(KeyCode::Char('q'), "quit")
+                        .action(KeyCode::Enter, "continue")
+                })
+                .expect("Double fault, time to crash to desktop");
+                match keycode {
+                    KeyCode::Char('q') => return,
+                    KeyCode::Char('c') => {}
+                    _ => unreachable!(),
                 }
             }
         }

@@ -1,6 +1,8 @@
+mod regexp;
+
 use async_lock::Mutex;
 use snafu::ResultExt;
-use sqlx::ConnectOptions as _;
+use sqlx::{ConnectOptions as _, Row};
 use std::{str::FromStr, sync::Arc};
 use zettelkasten_shared::{
     futures::{future::LocalBoxFuture, FutureExt},
@@ -97,9 +99,44 @@ impl storage::Storage for Connection {
     async fn get_zettels(
         &self,
         user: storage::UserId,
-        search: Option<storage::SearchOpts>,
+        search: storage::SearchOpts<'_>,
     ) -> Result<Vec<storage::ZettelHeader>, storage::Error> {
-        todo!()
+        let regex = regex::Regex::new(search.query).context(storage::InvalidRegexSnafu)?;
+
+        // we're using REGEXP here, and sql does not understand that because we need to register it ourselves
+        // therefor we can't use `sqlx::query_as!()` and instead have to do it manually.
+        let query = sqlx::query(
+            "SELECT zettel_id as id, path, body FROM zettel WHERE user_id = ? AND (body REGEXP ? OR title REGEXP ?)",
+        ).bind(user)
+        .bind(search.query)
+        .bind(search.query);
+        let results = query
+            .fetch_all(&mut *self.conn.lock().await)
+            .await
+            .context(storage::SqlxSnafu)?;
+
+        Ok(results
+            .into_iter()
+            .map(|row| {
+                let body: String = row.get(2);
+                let highlight_text = if let Some(m) = regex.find(&body) {
+                    let start = if m.start() < 10 { 0 } else { m.start() - 10 };
+                    let end = if m.end() + 10 >= body.len() {
+                        body.len()
+                    } else {
+                        m.end() + 10
+                    };
+                    Some(body[start..end].to_owned())
+                } else {
+                    None
+                };
+                storage::ZettelHeader {
+                    id: row.get(0),
+                    path: row.get(1),
+                    highlight_text,
+                }
+            })
+            .collect())
     }
 
     async fn get_zettel(
@@ -278,6 +315,9 @@ impl storage::ConnectableStorage for Connection {
                 .run(&mut connection)
                 .await
                 .context(storage::SqlxMigrateSnafu)?;
+
+            regexp::register(&mut connection).await;
+
             let connection = Connection {
                 conn: Arc::new(Mutex::new(connection)),
             };
