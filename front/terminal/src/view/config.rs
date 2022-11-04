@@ -11,12 +11,11 @@ use tui::{
 use zettelkasten_shared::storage;
 
 pub struct Config {
-    pub parent_page: Option<Box<super::View>>,
     form: Form,
 }
 
 impl Config {
-    pub(crate) fn new(parent_page: Option<super::View>, tui: &mut crate::Tui) -> Self {
+    pub(crate) fn new(tui: &mut crate::Tui) -> Self {
         let mut form = Form {
             active: 0,
             fields: Vec::new(),
@@ -48,10 +47,7 @@ impl Config {
             },
             validator: Some(validate_editor_path),
         });
-        Self {
-            parent_page: parent_page.map(Box::new),
-            form,
-        }
+        Self { form }
     }
 
     fn save(&self, tui: &mut crate::Tui) -> bool {

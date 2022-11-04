@@ -1,53 +1,72 @@
 mod config;
 mod login;
 mod register;
+mod search;
 mod utils;
 mod zettel;
 
 use crossterm::event::{Event, KeyCode};
 use snafu::{ResultExt, Snafu};
-use std::{
-    borrow::Cow,
-    io::{Read, Seek, SeekFrom, Write},
-    sync::Arc,
-};
+use std::{borrow::Cow, sync::Arc};
 use tui::{
     text::{Spans, Text},
     widgets::{Block, Borders, Paragraph},
 };
 use zettelkasten_shared::storage;
 
-pub enum View {
+pub struct View {
+    layers: Vec<ViewLayer>,
+}
+
+enum ViewLayer {
     Config(config::Config),
     Login(login::Login),
     Register(register::Register),
     Zettel(zettel::Zettel),
+    Search(search::Search),
 }
 
-impl From<login::Login> for View {
+enum ViewReplace {
+    Pop,
+    Push(ViewLayer),
+    Replace(ViewLayer),
+}
+
+impl From<ViewLayer> for View {
+    fn from(l: ViewLayer) -> Self {
+        Self { layers: vec![l] }
+    }
+}
+
+impl From<login::Login> for ViewLayer {
     fn from(v: login::Login) -> Self {
-        Self::Login(v)
+        ViewLayer::Login(v)
     }
 }
 
-impl From<zettel::Zettel> for View {
+impl From<zettel::Zettel> for ViewLayer {
     fn from(v: zettel::Zettel) -> Self {
-        Self::Zettel(v)
+        ViewLayer::Zettel(v)
     }
 }
-impl From<config::Config> for View {
+impl From<config::Config> for ViewLayer {
     fn from(v: config::Config) -> Self {
-        Self::Config(v)
+        ViewLayer::Config(v)
+    }
+}
+impl From<search::Search> for ViewLayer {
+    fn from(v: search::Search) -> Self {
+        ViewLayer::Search(v)
     }
 }
 
 impl View {
     pub fn new(system_config: &storage::SystemConfig, storage: &Arc<dyn storage::Storage>) -> Self {
-        match system_config.user_mode {
+        let layer = match system_config.user_mode {
             storage::UserMode::SingleUserAutoLogin => {
                 match zettelkasten_shared::block_on(storage.login_single_user()) {
                     // Successfully logged in
-                    Ok(user) => Self::Zettel(user.into()),
+                    Ok(user) => zettel::Zettel::new_with_user(storage, user).into(),
                     // Failed to log in, show the login view and the error
                     Err(source) => login::Login {
                         error: Some(login::LoginError::Storage { source }),
@@ -60,137 +79,74 @@ impl View {
                 // show the login view
                 login::Login::default().into()
             }
+        };
+        Self {
+            layers: vec![layer],
         }
     }
 
-    pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> Result<Option<View>> {
-        let next = match self {
-            Self::Zettel(li) => match li.render(tui)? {
-                Some(zettel::Transition::Exit) => {
-                    tui.running = false;
-                    None
-                }
-                Some(zettel::Transition::NavigateTo { path }) => {
-                    if let Some(sys_path) = path.strip_prefix("sys:") {
-                        open_sys_page(sys_path, li, tui)
-                    } else {
-                        let zettel = zettelkasten_shared::block_on(
-                            tui.storage.get_zettel_by_url(li.user.id, &path),
-                        )
-                        .context(DatabaseSnafu)?;
+    pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> Result {
+        use ViewReplace::{Pop, Push, Replace};
 
-                        let zettel = if let Some(zettel) = zettel {
-                            zettelkasten_shared::block_on(
-                                tui.storage
-                                    .set_user_last_visited_zettel(li.user.id, Some(zettel.id)),
-                            )
-                            .context(DatabaseSnafu)?;
-                            zettel
-                        } else {
-                            storage::Zettel {
-                                path,
-                                ..Default::default()
-                            }
-                        };
+        let layer: &mut ViewLayer = self.layers.last_mut().unwrap();
 
-                        Some(
-                            zettel::Zettel {
-                                user: li.user.clone(),
-                                zettel: Some(zettel),
-                            }
-                            .into(),
-                        )
-                    }
-                }
-                Some(zettel::Transition::Logout) => Some(Self::Login(Default::default())),
-                Some(zettel::Transition::OpenConfig) => {
-                    Some(config::Config::new(Some(Self::Zettel(li.clone())), tui).into())
-                }
-                Some(zettel::Transition::Edit) => {
-                    let zettel = li.zettel.as_mut().unwrap();
-                    if let Some(new_body) = edit(zettel, tui)? {
-                        zettel.body = new_body;
-                        zettelkasten_shared::block_on(
-                            tui.storage.update_zettel(li.user.id, zettel),
-                        )
-                        .context(DatabaseSnafu)?;
-                    }
-                    None
-                }
-
-                None => None,
+        let next: ViewReplace = match layer {
+            ViewLayer::Zettel(zettel) => match zettel.render(tui)? {
+                Some(t) => match t.into_view_replace(zettel, tui)? {
+                    Some(replace) => replace,
+                    None => return Ok(()),
+                },
+                None => return Ok(()),
             },
-            Self::Login(login) => match login.render(tui)? {
+            ViewLayer::Login(login) => match login.render(tui)? {
                 Some(login::Transition::Exit) => {
                     tui.running = false;
-                    None
+                    return Ok(());
                 }
-                Some(login::Transition::Register) => Some(Self::Register(Default::default())),
-                Some(login::Transition::Login { user }) => Some(Self::Zettel(user.into())),
-                None => None,
+                Some(login::Transition::Register) => {
+                    Replace(ViewLayer::Register(Default::default()))
+                }
+                Some(login::Transition::Login { user }) => {
+                    Replace(zettel::Zettel::new_with_user(&tui.storage, user).into())
+                }
+                None => return Ok(()),
             },
-            Self::Register(reg) => match reg.render(tui)? {
+            ViewLayer::Register(reg) => match reg.render(tui)? {
                 Some(register::Transition::Exit) => {
                     tui.running = false;
-                    None
+                    return Ok(());
                 }
-                Some(register::Transition::Registered { user }) => Some(Self::Zettel(user.into())),
-                Some(register::Transition::Login) => Some(Self::Login(Default::default())),
-                None => None,
+                Some(register::Transition::Registered { user }) => {
+                    Replace(zettel::Zettel::new_with_user(&tui.storage, user).into())
+                }
+                Some(register::Transition::Login) => Replace(ViewLayer::Login(Default::default())),
+                None => return Ok(()),
             },
-            Self::Config(config) => match config.render(tui)? {
-                Some(config::Transition::Pop) => config.parent_page.take().map(|b| *b),
-                None => None,
+            ViewLayer::Config(config) => match config.render(tui)? {
+                Some(config::Transition::Pop) => Pop,
+                None => return Ok(()),
+            },
+            ViewLayer::Search(search) => match search.render(tui)? {
+                Some(search::Transition::Pop) => Pop,
+                None => return Ok(()),
             },
         };
 
-        Ok(next)
+        match next {
+            Pop => {
+                let _ = self.layers.pop();
+                assert!(!self.layers.is_empty());
+            }
+            Push(layer) => {
+                self.layers.push(layer);
+            }
+            Replace(layer) => {
+                self.layers = vec![layer];
+            }
+        }
+
+        Ok(())
     }
-}
-
-fn open_sys_page(path: &str, li: &zettel::Zettel, tui: &mut crate::Tui) -> Option<View> {
-    if path == "config" {
-        Some(config::Config::new(Some(View::Zettel(li.clone())), tui).into())
-    } else {
-        alert(tui.terminal, |f| {
-            f.title("Reserved sys page")
-                .text(format!(
-                    "`sys:` is a reserved prefix, could not navigate to `sys:{path:?}`"
-                ))
-                .action(KeyCode::Char('c'), "continue")
-        })
-        .expect("Double fault, time to crash to desktop");
-        None
-    }
-}
-
-fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> Result<Option<String>> {
-    let editor = if let Some(editor) = &tui.system_config.terminal_editor {
-        editor
-    } else {
-        alert(tui.terminal, |cb| {
-            cb.title("Could not edit zettel")
-                .text("No terminal editor configured")
-                .text("Please set one up in sys:config")
-        })?;
-        return Ok(None);
-    };
-    let mut tmp_file = tempfile::Builder::new()
-        .suffix(".md")
-        .tempfile()
-        .context(IoSnafu)?;
-    tmp_file
-        .write_all(zettel.body.as_bytes())
-        .context(IoSnafu)?;
-    let _status = std::process::Command::new(editor)
-        .arg(tmp_file.path())
-        .status()
-        .context(IoSnafu)?;
-
-    tmp_file.seek(SeekFrom::Start(0)).context(IoSnafu)?;
-    let mut result = String::new();
-    tmp_file.read_to_string(&mut result).context(IoSnafu)?;
-    Ok(Some(result))
 }
 
 pub type Result<T = ()> = std::result::Result<T, ViewError>;

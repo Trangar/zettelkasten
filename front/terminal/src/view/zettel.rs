@@ -1,3 +1,8 @@
+use std::{
+    io::{Read, Seek, SeekFrom, Write},
+    sync::Arc,
+};
+
 use super::utils::ParsedZettel;
 use crossterm::event::{Event, KeyCode};
 use snafu::ResultExt;
@@ -11,15 +16,8 @@ use zettelkasten_shared::storage;
 #[derive(Clone)]
 pub struct Zettel {
     pub user: storage::User,
-    pub zettel: Option<storage::Zettel>,
+    pub zettel: storage::Zettel,
 }
-
-impl From<storage::User> for Zettel {
-    fn from(user: storage::User) -> Self {
-        Self { user, zettel: None }
-    }
-}
-
 const ENTRY_TEXT: &str = r#"Welcome to Zettelkasten
 
 You can see the available controls at the bottom of the page. If you are an admin, make sure to check out the config page (`C`).
@@ -37,43 +35,14 @@ You can see the available controls at the bottom of the page. If you are an admi
 const DISALLOWED_CHARS: &[char] = &['a', 'c', 'e', 'f', 'l', 'q', 's'];
 
 impl Zettel {
-    fn load_zettel(&mut self, tui: &crate::Tui) -> super::Result<&storage::Zettel> {
-        // Rust is having some fuckery here, if we use the normal method, we get lifetime errors:
-        // if let Some(zettel) = self.zettel.as_ref() {
-        // so instead we have to check for `.is_some()` and `unwrap()`
-        if self.zettel.is_some() {
-            return Ok(self.zettel.as_ref().expect("unreachable"));
-        } else if let Some(id) = self.user.last_visited_zettel {
-            let result = zettelkasten_shared::block_on(tui.storage.get_zettel(self.user.id, id));
-            if let Ok(zettel) = result {
-                Ok(self.zettel.insert(zettel))
-            } else {
-                self.user.last_visited_zettel = None;
-                // make sure we reset the zettel for the next time around, as we failed to load one
-                zettelkasten_shared::block_on(
-                    tui.storage.set_user_last_visited_zettel(self.user.id, None),
-                )
-                .context(super::DatabaseSnafu)?;
-                Err(super::ViewError::ZettelIdNotFound { id })
-            }
-        } else {
-            Ok(self.zettel.insert(storage::Zettel {
-                path: "home".to_string(),
-                body: ENTRY_TEXT.into(),
-                ..Default::default()
-            }))
-        }
-    }
-
     pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> super::Result<Option<Transition>> {
-        let current_zettel = self.load_zettel(tui)?;
         let mut render_link_input: Option<String> = None;
         let mut rendered_zettel = None;
         loop {
-            let title = &current_zettel.path;
+            let title = &self.zettel.path;
             let zettel = rendered_zettel.get_or_insert_with(|| {
                 ParsedZettel::parse(
-                    current_zettel,
+                    &self.zettel,
                     DISALLOWED_CHARS,
                     render_link_input.is_some(),
                     Default::default(),
@@ -129,7 +98,7 @@ impl Zettel {
                     }
                     KeyCode::Char('l') => return Ok(Some(Transition::Logout)),
                     KeyCode::Char('q') => return Ok(Some(Transition::Exit)),
-                    KeyCode::Char('s') => return Err(super::ViewError::NotImplemented),
+                    KeyCode::Char('s') => return Ok(Some(Transition::Search)),
                     _ => {}
                 }
 
@@ -154,6 +123,21 @@ impl Zettel {
             }
         }
     }
+
+    pub(crate) fn new_with_user(storage: &Arc<dyn storage::Storage>, user: storage::User) -> Self {
+        let zettel: Option<storage::Zettel> = user.last_visited_zettel.and_then(|zettel_id| {
+            zettelkasten_shared::block_on(storage.get_zettel(user.id, zettel_id)).ok()
+        });
+        Self {
+            user,
+            zettel: zettel.unwrap_or_else(|| storage::Zettel {
+                id: 0,
+                path: "home".into(),
+                body: ENTRY_TEXT.into(),
+                attachments: Vec::new(),
+            }),
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -163,4 +147,118 @@ pub enum Transition {
     NavigateTo { path: String },
     OpenConfig,
     Edit,
+    Search,
+}
+
+impl Transition {
+    pub(super) fn into_view_replace(
+        self,
+        parent: &mut Zettel,
+        tui: &mut crate::Tui,
+    ) -> super::Result<Option<super::ViewReplace>> {
+        use super::ViewReplace::*;
+        Ok(match self {
+            Self::Exit => {
+                tui.running = false;
+                None
+            }
+            Self::Logout => Some(Replace(super::login::Login::default().into())),
+            Self::NavigateTo { path } => {
+                if let Some(sys_path) = path.strip_prefix("sys:") {
+                    match open_sys_page(sys_path, tui) {
+                        Some(page) => Some(Push(page)),
+                        None => None,
+                    }
+                } else {
+                    let zettel = zettelkasten_shared::block_on(
+                        tui.storage.get_zettel_by_url(parent.user.id, &path),
+                    )
+                    .context(super::DatabaseSnafu)?;
+
+                    let zettel = if let Some(zettel) = zettel {
+                        zettelkasten_shared::block_on(
+                            tui.storage
+                                .set_user_last_visited_zettel(parent.user.id, Some(zettel.id)),
+                        )
+                        .context(super::DatabaseSnafu)?;
+                        zettel
+                    } else {
+                        storage::Zettel {
+                            path,
+                            ..Default::default()
+                        }
+                    };
+
+                    Some(Replace(
+                        Zettel {
+                            user: parent.user.clone(),
+                            zettel,
+                        }
+                        .into(),
+                    ))
+                }
+            }
+            Self::OpenConfig => Some(Push(super::config::Config::new(tui).into())),
+            Self::Edit => {
+                if let Some(str) = edit(parent, tui)? {
+                    parent.zettel.body = str;
+                    zettelkasten_shared::block_on(
+                        tui.storage
+                            .update_zettel(parent.user.id, &mut parent.zettel),
+                    )
+                    .context(super::DatabaseSnafu)?;
+                }
+                None
+            }
+            Self::Search => Some(Push(super::search::Search::default().into())),
+        })
+    }
+}
+
+fn open_sys_page(path: &str, tui: &mut crate::Tui) -> Option<super::ViewLayer> {
+    if path == "config" {
+        Some(super::config::Config::new(tui).into())
+    } else {
+        super::alert(tui.terminal, |f| {
+            f.title("Reserved sys page")
+                .text(format!(
+                    "`sys:` is a reserved prefix, could not navigate to `sys:{path:?}`"
+                ))
+                .action(KeyCode::Char('c'), "continue")
+        })
+        .expect("Double fault, time to crash to desktop");
+        None
+    }
+}
+
+fn edit(zettel: &Zettel, tui: &mut crate::Tui) -> super::Result<Option<String>> {
+    let editor = if let Some(editor) = &tui.system_config.terminal_editor {
+        editor
+    } else {
+        super::alert(tui.terminal, |cb| {
+            cb.title("Could not edit zettel")
+                .text("No terminal editor configured")
+                .text("Please set one up in sys:config")
+        })?;
+        return Ok(None);
+    };
+    let mut tmp_file = tempfile::Builder::new()
+        .suffix(".md")
+        .tempfile()
+        .context(super::IoSnafu)?;
+    tmp_file
+        .write_all(zettel.zettel.body.as_bytes())
+        .context(super::IoSnafu)?;
+    let _status = std::process::Command::new(editor)
+        .arg(tmp_file.path())
+        .status()
+        .context(super::IoSnafu)?;
+
+    tmp_file.seek(SeekFrom::Start(0)).context(super::IoSnafu)?;
+    let mut result = String::new();
+    tmp_file
+        .read_to_string(&mut result)
+        .context(super::IoSnafu)?;
+    tui.terminal.clear().context(super::IoSnafu)?;
+    Ok(Some(result))
 }
