@@ -13,11 +13,6 @@ use tui::{
 };
 use zettelkasten_shared::storage;
 
-#[derive(Clone)]
-pub struct Zettel {
-    pub user: storage::User,
-    pub zettel: storage::Zettel,
-}
 const ENTRY_TEXT: &str = r#"Welcome to Zettelkasten
 
 You can see the available controls at the bottom of the page. If you are an admin, make sure to check out the config page (`C`).
@@ -34,7 +29,34 @@ You can see the available controls at the bottom of the page. If you are an admi
 
 const DISALLOWED_CHARS: &[char] = &['a', 'c', 'e', 'f', 'l', 'q', 's'];
 
+#[derive(Clone)]
+pub struct Zettel {
+    user: Arc<storage::User>,
+    zettel: storage::Zettel,
+}
+
 impl Zettel {
+    pub(crate) fn new_with_user(
+        storage: &Arc<dyn storage::Storage>,
+        user: Arc<storage::User>,
+    ) -> Self {
+        let zettel: Option<storage::Zettel> = user.last_visited_zettel.and_then(|zettel_id| {
+            zettelkasten_shared::block_on(storage.get_zettel(user.id, zettel_id)).ok()
+        });
+        Self::new_with_zettel(
+            user,
+            zettel.unwrap_or_else(|| storage::Zettel {
+                id: 0,
+                path: "home".into(),
+                body: ENTRY_TEXT.into(),
+                attachments: Vec::new(),
+            }),
+        )
+    }
+    pub(crate) fn new_with_zettel(user: Arc<storage::User>, zettel: storage::Zettel) -> Self {
+        Self { user, zettel }
+    }
+
     pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> super::Result<Option<Transition>> {
         let mut render_link_input: Option<String> = None;
         let mut rendered_zettel = None;
@@ -123,21 +145,6 @@ impl Zettel {
             }
         }
     }
-
-    pub(crate) fn new_with_user(storage: &Arc<dyn storage::Storage>, user: storage::User) -> Self {
-        let zettel: Option<storage::Zettel> = user.last_visited_zettel.and_then(|zettel_id| {
-            zettelkasten_shared::block_on(storage.get_zettel(user.id, zettel_id)).ok()
-        });
-        Self {
-            user,
-            zettel: zettel.unwrap_or_else(|| storage::Zettel {
-                id: 0,
-                path: "home".into(),
-                body: ENTRY_TEXT.into(),
-                attachments: Vec::new(),
-            }),
-        }
-    }
 }
 
 #[allow(dead_code)]
@@ -165,10 +172,7 @@ impl Transition {
             Self::Logout => Some(Replace(super::login::Login::default().into())),
             Self::NavigateTo { path } => {
                 if let Some(sys_path) = path.strip_prefix("sys:") {
-                    match open_sys_page(sys_path, tui) {
-                        Some(page) => Some(Push(page)),
-                        None => None,
-                    }
+                    open_sys_page(sys_path, tui).map(Push)
                 } else {
                     let zettel = zettelkasten_shared::block_on(
                         tui.storage.get_zettel_by_url(parent.user.id, &path),
@@ -210,7 +214,9 @@ impl Transition {
                 }
                 None
             }
-            Self::Search => Some(Push(super::search::Search::default().into())),
+            Self::Search => Some(Push(
+                super::search::Search::new(Arc::clone(&parent.user)).into(),
+            )),
         })
     }
 }
@@ -224,7 +230,7 @@ fn open_sys_page(path: &str, tui: &mut crate::Tui) -> Option<super::ViewLayer> {
                 .text(format!(
                     "`sys:` is a reserved prefix, could not navigate to `sys:{path:?}`"
                 ))
-                .action(KeyCode::Char('c'), "continue")
+                .action(KeyCode::Enter, "continue")
         })
         .expect("Double fault, time to crash to desktop");
         None
@@ -239,6 +245,7 @@ fn edit(zettel: &Zettel, tui: &mut crate::Tui) -> super::Result<Option<String>> 
             cb.title("Could not edit zettel")
                 .text("No terminal editor configured")
                 .text("Please set one up in sys:config")
+                .action(KeyCode::Enter, "Continue")
         })?;
         return Ok(None);
     };

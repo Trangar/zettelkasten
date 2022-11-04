@@ -62,7 +62,7 @@ impl Front for Tui<'_> {
                     f.title("Could not render page")
                         .text(e.to_string())
                         .action(KeyCode::Char('q'), "quit")
-                        .action(KeyCode::Char('c'), "continue")
+                        .action(KeyCode::Enter, "continue")
                 })
                 .expect("Double fault, time to crash to desktop");
                 match keycode {

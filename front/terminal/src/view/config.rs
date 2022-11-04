@@ -70,7 +70,9 @@ impl Config {
         };
         if let Err(e) = zettelkasten_shared::block_on(tui.storage.update_config(&config)) {
             let _ = super::alert(tui.terminal, |f| {
-                f.title("Could not save config").text(e.to_string())
+                f.title("Could not save config")
+                    .text(e.to_string())
+                    .action(KeyCode::Enter, "Continue")
             });
             return false;
         }

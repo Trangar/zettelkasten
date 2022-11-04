@@ -14,7 +14,7 @@ pub trait Storage: Send + Sync {
     async fn get_zettels(
         &self,
         user: UserId,
-        search: Option<SearchOpts>,
+        search: SearchOpts<'_>,
     ) -> Result<Vec<ZettelHeader>, Error>;
     async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Zettel, Error>;
     async fn get_zettel_by_url(&self, user: UserId, url: &str) -> Result<Option<Zettel>, Error>;
@@ -42,13 +42,14 @@ pub struct User {
     pub last_visited_zettel: Option<ZettelId>,
 }
 
-pub struct SearchOpts {}
+pub struct SearchOpts<'a> {
+    pub query: &'a str,
+}
 
 #[derive(sqlx::FromRow)]
 pub struct ZettelHeader {
     pub id: ZettelId,
-    pub url: String,
-    pub title: String,
+    pub path: String,
     pub highlight_text: Option<String>,
 }
 
@@ -74,6 +75,7 @@ pub enum Error {
     Json { source: serde_json::Error },
     Sqlx { source: sqlx::Error },
     SqlxMigrate { source: sqlx::migrate::MigrateError },
+    InvalidRegex { source: regex::Error },
 
     SingleUserNotFound,
     UserAlreadyExists,

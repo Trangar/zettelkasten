@@ -66,7 +66,7 @@ impl View {
             storage::UserMode::SingleUserAutoLogin => {
                 match zettelkasten_shared::block_on(storage.login_single_user()) {
                     // Successfully logged in
-                    Ok(user) => zettel::Zettel::new_with_user(storage, user).into(),
+                    Ok(user) => zettel::Zettel::new_with_user(storage, Arc::new(user)).into(),
                     // Failed to log in, show the login view and the error
                     Err(source) => login::Login {
                         error: Some(login::LoginError::Storage { source }),
@@ -107,7 +107,7 @@ impl View {
                     Replace(ViewLayer::Register(Default::default()))
                 }
                 Some(login::Transition::Login { user }) => {
-                    Replace(zettel::Zettel::new_with_user(&tui.storage, user).into())
+                    Replace(zettel::Zettel::new_with_user(tui.storage, Arc::new(user)).into())
                 }
                 None => return Ok(()),
             },
@@ -117,7 +117,7 @@ impl View {
                     return Ok(());
                 }
                 Some(register::Transition::Registered { user }) => {
-                    Replace(zettel::Zettel::new_with_user(&tui.storage, user).into())
+                    Replace(zettel::Zettel::new_with_user(tui.storage, Arc::new(user)).into())
                 }
                 Some(register::Transition::Login) => Replace(ViewLayer::Login(Default::default())),
                 None => return Ok(()),
@@ -127,6 +127,7 @@ impl View {
                 None => return Ok(()),
             },
             ViewLayer::Search(search) => match search.render(tui)? {
+                Some(search::Transition::NewZettel(zettel)) => Replace(zettel.into()),
                 Some(search::Transition::Pop) => Pop,
                 None => return Ok(()),
             },
