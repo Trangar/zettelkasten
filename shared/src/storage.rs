@@ -42,8 +42,10 @@ pub struct User {
     pub last_visited_zettel: Option<ZettelId>,
 }
 
+#[derive(Default)]
 pub struct SearchOpts<'a> {
     pub query: &'a str,
+    pub list_all: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -79,6 +81,7 @@ pub enum Error {
 
     SingleUserNotFound,
     UserAlreadyExists,
+    InvalidSearchOpts,
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]

@@ -1,4 +1,5 @@
 mod config;
+mod list;
 mod login;
 mod register;
 mod search;
@@ -24,6 +25,7 @@ enum ViewLayer {
     Register(register::Register),
     Zettel(zettel::Zettel),
     Search(search::Search),
+    List(list::List),
 }
 
 enum ViewReplace {
@@ -59,6 +61,11 @@ impl From<search::Search> for ViewLayer {
         ViewLayer::Search(v)
     }
 }
+impl From<list::List> for ViewLayer {
+    fn from(v: list::List) -> Self {
+        ViewLayer::List(v)
+    }
+}
 
 impl View {
     pub fn new(system_config: &storage::SystemConfig, storage: &Arc<dyn storage::Storage>) -> Self {
@@ -92,11 +99,35 @@ impl View {
 
         let next: ViewReplace = match layer {
             ViewLayer::Zettel(zettel) => match zettel.render(tui)? {
-                Some(t) => match t.into_view_replace(zettel, tui)? {
-                    Some(replace) => replace,
-                    None => return Ok(()),
-                },
-                None => return Ok(()),
+                Some(zettel::Transition::Edit) => {
+                    if let Some(str) = utils::edit(&zettel.zettel, tui)? {
+                        zettel.zettel.body = str;
+                        zettelkasten_shared::block_on(
+                            tui.storage
+                                .update_zettel(zettel.user.id, &mut zettel.zettel),
+                        )
+                        .context(DatabaseSnafu)?;
+                    }
+                    return Ok(());
+                }
+                Some(zettel::Transition::Exit) => {
+                    tui.running = false;
+                    return Ok(());
+                }
+                Some(zettel::Transition::Logout) => Replace(login::Login::default().into()),
+                Some(zettel::Transition::OpenConfig) => Push(config::Config::new(tui).into()),
+                Some(zettel::Transition::Search) => {
+                    Push(search::Search::new(Arc::clone(&zettel.user)).into())
+                }
+                Some(zettel::Transition::ZettelList) => {
+                    Push(list::List::new(Arc::clone(&zettel.user), tui)?.into())
+                }
+                Some(zettel::Transition::NavigateTo(new_zettel)) => Replace(
+                    zettel::Zettel::new_with_zettel(Arc::clone(&zettel.user), new_zettel).into(),
+                ),
+                None => {
+                    return Ok(());
+                }
             },
             ViewLayer::Login(login) => match login.render(tui)? {
                 Some(login::Transition::Exit) => {
@@ -129,6 +160,11 @@ impl View {
             ViewLayer::Search(search) => match search.render(tui)? {
                 Some(search::Transition::NewZettel(zettel)) => Replace(zettel.into()),
                 Some(search::Transition::Pop) => Pop,
+                None => return Ok(()),
+            },
+            ViewLayer::List(list) => match list.render(tui)? {
+                Some(list::Transition::NewZettel(zettel)) => Replace(zettel.into()),
+                Some(list::Transition::Pop) => Pop,
                 None => return Ok(()),
             },
         };
@@ -175,8 +211,6 @@ pub enum ViewError {
     ZettelIdNotFound {
         id: i64,
     },
-    #[snafu(display("Not implemented"))]
-    NotImplemented,
     Io {
         source: std::io::Error,
     },

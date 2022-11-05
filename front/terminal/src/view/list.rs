@@ -3,53 +3,86 @@ use snafu::ResultExt;
 use std::sync::Arc;
 use tui::{
     layout::Rect,
-    style::{Color, Style},
     text::{Span, Spans},
     widgets::{Block, Borders, Paragraph},
 };
 use zettelkasten_shared::storage;
 
-pub struct Search {
+pub struct List {
     user: Arc<storage::User>,
-    input: String,
     selected: usize,
-    results: Vec<storage::ZettelHeader>,
+    search: String,
+    links: Vec<storage::ZettelHeader>,
 }
 
-impl Search {
-    pub(crate) fn new(user: Arc<storage::User>) -> Self {
-        Self {
+impl List {
+    pub fn new(user: Arc<storage::User>, tui: &crate::Tui) -> super::Result<Self> {
+        let links = zettelkasten_shared::block_on(tui.storage.get_zettels(
+            user.id,
+            storage::SearchOpts {
+                list_all: true,
+                ..Default::default()
+            },
+        ))
+        .context(super::DatabaseSnafu)?;
+        Ok(Self {
             user,
-            input: String::new(),
             selected: 0,
-            results: Vec::new(),
-        }
+            search: String::new(),
+            links,
+        })
     }
 
-    pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> super::Result<Option<Transition>> {
+    pub(crate) fn render<'a>(
+        &'a mut self,
+        tui: &mut crate::Tui,
+    ) -> super::Result<Option<Transition>> {
         loop {
+            let links: Vec<&storage::ZettelHeader> = if self.search.trim().is_empty() {
+                self.links.iter().collect()
+            } else {
+                self.links
+                    .iter()
+                    .filter(|l| {
+                        l.path
+                            .to_ascii_lowercase()
+                            .contains(&self.search.to_ascii_lowercase())
+                    })
+                    .collect()
+            };
+            if links.is_empty() {
+                self.selected = 0;
+            } else if links.len() <= self.selected {
+                self.selected = links.len() - 1;
+            }
             tui.terminal
                 .draw(|f| {
                     let size = f.size();
-                    let search = Paragraph::new(self.input.as_str())
+                    let search = Paragraph::new(self.search.as_str())
                         .block(Block::default().borders(Borders::all()).title("Search"));
 
                     let mut entries = Vec::new();
-                    for (idx, zettel) in self.results.iter().enumerate() {
+                    let mut previous_parts = None;
+                    for (idx, zettel) in links.iter().enumerate() {
                         let mut spans = Spans::default();
 
                         spans
                             .0
                             .push(Span::raw(if self.selected == idx { "> " } else { "  " }));
-                        spans.0.push(Span::styled(
-                            zettel.path.as_str(),
-                            Style::default().fg(Color::Yellow),
-                        ));
-                        if let Some(text) = &zettel.highlight_text {
-                            spans.0.push(Span::raw(" "));
-                            spans.0.push(Span::raw(text.replace(['\n', '\r'], "")));
+                        let parts = zettel.path.split('/').collect::<Vec<_>>();
+                        let common_parts =
+                            CommonParts::get(&parts, previous_parts.as_deref().unwrap_or_default());
+                        for _ in 0..common_parts.common_length {
+                            spans.0.push(Span::raw("  "));
+                        }
+                        for (idx, remaining) in common_parts.remaining.iter().enumerate() {
+                            if idx != 0 {
+                                spans.0.push(Span::raw("/"));
+                            }
+                            spans.0.push(Span::raw(remaining.to_string()));
                         }
 
+                        previous_parts = Some(parts);
                         entries.push(spans);
                     }
                     let body = Paragraph::new(entries).block(
@@ -77,21 +110,16 @@ impl Search {
                     );
                 })
                 .context(super::IoSnafu)?;
-
             let event = crossterm::event::read().context(super::EventSnafu)?;
             if let Event::Key(key_event) = event {
                 match key_event.code {
-                    KeyCode::Char(c) => {
-                        self.input.push(c);
-                        self.update_search(tui)?;
-                    }
+                    KeyCode::Char(c) => self.search.push(c),
                     KeyCode::Backspace => {
-                        self.input.pop();
-                        self.update_search(tui)?;
+                        self.search.pop();
                     }
                     KeyCode::Esc => return Ok(Some(Transition::Pop)),
                     KeyCode::Enter => {
-                        let Some(zettel_header) = self.results.get(self.selected) else { continue };
+                        let Some(zettel_header) = links.get(self.selected) else { continue };
                         match zettelkasten_shared::block_on(
                             tui.storage.get_zettel(self.user.id, zettel_header.id),
                         ) {
@@ -119,7 +147,7 @@ impl Search {
                         }
                     }
                     KeyCode::Down => {
-                        if self.selected + 1 < self.results.len() {
+                        if self.selected + 1 < links.len() {
                             self.selected += 1
                         }
                     }
@@ -128,26 +156,23 @@ impl Search {
             }
         }
     }
+}
 
-    fn update_search(&mut self, tui: &mut crate::Tui) -> super::Result {
-        if self.input.is_empty() {
-            self.results.clear();
-        } else {
-            let query = storage::SearchOpts {
-                query: &self.input,
-                ..Default::default()
-            };
-            self.results =
-                zettelkasten_shared::block_on(tui.storage.get_zettels(self.user.id, query))
-                    .context(super::DatabaseSnafu)?;
+struct CommonParts<'a> {
+    pub common_length: usize,
+    pub remaining: &'a [&'a str],
+}
+impl<'a> CommonParts<'a> {
+    fn get(current: &'a [&'a str], previous: &[&str]) -> Self {
+        let common_length = current
+            .iter()
+            .zip(previous.iter())
+            .take_while(|(left, right)| left.to_ascii_lowercase() == right.to_ascii_lowercase())
+            .count();
+        Self {
+            common_length,
+            remaining: &current[common_length..],
         }
-        if self.results.is_empty() {
-            self.selected = 0;
-        } else if self.selected >= self.results.len() {
-            self.selected = self.results.len() - 1;
-        }
-        // TODO
-        Ok(())
     }
 }
 

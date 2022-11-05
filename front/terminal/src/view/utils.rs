@@ -1,4 +1,9 @@
-use std::collections::HashMap;
+use crossterm::event::KeyCode;
+use snafu::ResultExt;
+use std::{
+    collections::HashMap,
+    io::{Read, Seek, SeekFrom, Write},
+};
 use tui::{
     style::{Color, Style},
     text::{Span, Spans},
@@ -167,4 +172,37 @@ impl Iterator for NamingScheme {
             }
         }
     }
+}
+
+pub fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> super::Result<Option<String>> {
+    let editor = if let Some(editor) = &tui.system_config.terminal_editor {
+        editor
+    } else {
+        super::alert(tui.terminal, |cb| {
+            cb.title("Could not edit zettel")
+                .text("No terminal editor configured")
+                .text("Please set one up in sys:config")
+                .action(KeyCode::Enter, "Continue")
+        })?;
+        return Ok(None);
+    };
+    let mut tmp_file = tempfile::Builder::new()
+        .suffix(".md")
+        .tempfile()
+        .context(super::IoSnafu)?;
+    tmp_file
+        .write_all(zettel.body.as_bytes())
+        .context(super::IoSnafu)?;
+    let _status = std::process::Command::new(editor)
+        .arg(tmp_file.path())
+        .status()
+        .context(super::IoSnafu)?;
+
+    tmp_file.seek(SeekFrom::Start(0)).context(super::IoSnafu)?;
+    let mut result = String::new();
+    tmp_file
+        .read_to_string(&mut result)
+        .context(super::IoSnafu)?;
+    tui.terminal.clear().context(super::IoSnafu)?;
+    Ok(Some(result))
 }
