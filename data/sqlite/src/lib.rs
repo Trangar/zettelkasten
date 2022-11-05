@@ -18,7 +18,6 @@ pub struct Connection {
     conn: Arc<Mutex<sqlx::SqliteConnection>>,
 }
 
-#[allow(unused_variables)]
 #[zettelkasten_shared::async_trait]
 impl Storage for Connection {
     async fn user_count(&self) -> Result<u64, Error> {

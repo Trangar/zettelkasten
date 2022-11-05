@@ -1,6 +1,6 @@
 [package]
 name = "zettelkasten-shared"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 
 [features]
@@ -20,6 +20,6 @@ snafu = { version = "0.7.2", features = ["std"], default-features = false }
 regex = { version = "1.6.0", default-features = false }
 
 [dependencies.sqlx]
-version = "*"
+version = "0.6.2"
 default-features = false
 features = ["macros", "migrate"]
