@@ -51,3 +51,13 @@ To use a sqlite database you need to:
     - run `sqlx database setup --source data/sqlite/migrations`
   - manually:
     - create a database file and run all the queries in `data/sqlite/migrations/*.up.sql`
+
+`data-sqlite` will look for, or create, a database in the following places:
+- At the location of one of the following environment variables:
+  - `DATABASE_URL`
+  - `ZETTELKASTEN_DATABASE_URL`
+  - Note that if there is a `.env` file present, this will be loaded
+- `<DATA_DIR>/zettelkasten/database.db` where `<DATA_DIR>` is the value from [dirs::data_dir](https://docs.rs/dirs/latest/dirs/fn.data_dir.html)
+  - Linux: `$XDG_DATA_HOME` or `$HOME/.local/share`
+  - Windows: `C:/Users/<user>/AppData/Roaming/`
+- The local directory, if the above fail (`./database.db`)

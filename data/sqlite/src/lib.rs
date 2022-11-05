@@ -302,7 +302,6 @@ impl ConnectableStorage for Connection {
         connection_args: Self::ConnectionArgs,
     ) -> LocalBoxFuture<'a, Result<(Self, SystemConfig), Error>> {
         async move {
-            println!("Opening {connection_args:?}");
             let mut connection = sqlx::sqlite::SqliteConnectOptions::from_str(&connection_args)
                 .expect("Invalid SQLite connection string")
                 .create_if_missing(true)

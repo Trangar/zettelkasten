@@ -17,8 +17,18 @@ fn main() {
 async fn data_policy_should_exist_exactly_once(
 ) -> (Arc<dyn storage::Storage>, storage::SystemConfig) {
     let _ = dotenv::dotenv();
-    let connection_string =
-        std::env::var("DATABASE_URL").expect("Missing environment variable DATABASE_URL");
+
+    let connection_string = std::env::var("DATABASE_URL")
+        .or_else(|_| std::env::var("ZETTELKASTEN_DATABASE_URL"))
+        .unwrap_or_else(|_| {
+            let mut path = dirs::data_dir().unwrap_or_default();
+            path.push("zettelkasten");
+            std::fs::create_dir_all(&path)
+                .unwrap_or_else(|e| panic!("Could not create {path:?}: {e:?}"));
+            path.push("database.db");
+            path.display().to_string()
+        });
+
     let (connection, config) = zettelkasten_sqlite::Connection::connect(connection_string)
         .await
         .expect("Could not open database");
