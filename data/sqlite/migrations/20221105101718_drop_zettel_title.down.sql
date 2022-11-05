@@ -1,0 +1,1 @@
+ALTER TABLE zettel ADD COLUMN title NOT NULL DEFAULT ('');

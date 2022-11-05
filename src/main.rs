@@ -5,11 +5,12 @@ use zettelkasten_shared::{
 };
 
 #[allow(clippy::redundant_clone)]
-#[zettelkasten_shared::main]
-async fn main() {
-    let (connection, system_config) = data_policy_should_exist_exactly_once().await;
-    #[cfg(feature = "front-terminal")]
-    zettelkasten_terminal::Tui::run((), system_config.clone(), Arc::clone(&connection));
+fn main() {
+    zettelkasten_shared::block_on(async {
+        let (connection, system_config) = data_policy_should_exist_exactly_once().await;
+        #[cfg(feature = "front-terminal")]
+        zettelkasten_terminal::Tui::run((), system_config.clone(), Arc::clone(&connection));
+    });
 }
 
 #[cfg(feature = "data-sqlite")]

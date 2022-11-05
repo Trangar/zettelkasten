@@ -7,7 +7,9 @@ edition = "2021"
 runtime-async-std = ["sqlx/runtime-async-std-rustls", "dep:async-std"]
 
 [dependencies]
-async-std = { version = "1.0", optional = true, default-features = false }
+async-std = { version = "1.0", optional = true, default-features = false, features = [
+    "attributes",
+] }
 async-trait = { version = "0.1.57", default-features = false }
 bcrypt = { version = "0.13.0", default-features = false, features = ["std"] }
 custom_debug = { version = "0.5.0", default-features = false }

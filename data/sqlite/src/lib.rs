@@ -178,9 +178,9 @@ impl Storage for Connection {
         if zettel.id == 0 {
             let query = sqlx::query!(
                 r#"INSERT INTO zettel
-                (user_id, path, body, title, created_on, last_modified_on)
+                (user_id, path, body, created_on, last_modified_on)
                 VALUES
-                (?, ?, ?, '', datetime(), datetime())
+                (?, ?, ?, datetime(), datetime())
                 "#,
                 user,
                 zettel.path,
@@ -329,7 +329,7 @@ async fn test_db() -> (Connection, User) {
 
 #[test]
 fn test_search_in_path() {
-    zettelkasten_shared::block_on(async move {
+    zettelkasten_shared::block_on(async {
         let (db, user) = test_db().await;
         let result = db
             .get_zettels(user.id, SearchOpts { query: "home" })
