@@ -17,3 +17,8 @@ clippy:
 
 fmt:
     cargo fmt --all
+
+test: test_async_std
+
+test_async_std:
+    cargo test --features front-terminal,data-sqlite,runtime-async-std --workspace

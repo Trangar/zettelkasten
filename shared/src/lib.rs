@@ -19,3 +19,6 @@ where
 {
     async_std::task::block_on(f)
 }
+
+#[cfg(feature = "runtime-async-std")]
+pub use async_std::main;
