@@ -1,0 +1,109 @@
+on:
+  release:
+    types: [created]
+
+name: Build release
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install sqlx
+        uses: baptiste0928/cargo-install@v1
+        with:
+          crate: sqlx-cli
+          version: 0.6
+          features: sqlite,rustls
+          args: --no-default-features
+
+      - name: Setup database
+        run: |
+          echo "DATABASE_URL=sqlite://database.db" >> .env
+          sqlx database setup --source data/sqlite/migrations
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --features runtime-async-std,data-sqlite,front-terminal
+
+      - name: Extract .pdb file
+        run: |
+          set -ex
+          mkdir out
+
+          objcopy --only-keep-debug zettelkasten zettelkasten.pdb
+          strip --strip-debug --strip-unneeded zettelkasten
+          zip release.zip zettelkasten zettelkasten.pdb
+        working-directory: target/release/
+      
+      - name: Upload zettelkasten to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/release.zip
+          tag: ${{ github.ref }}
+          asset_name: Linux.release.zip
+          overwrite: true
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    environment: release
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install sqlx
+        uses: baptiste0928/cargo-install@v1
+        with:
+          crate: sqlx-cli
+          version: 0.6
+          features: sqlite,rustls
+          args: --no-default-features
+
+      - name: Setup database
+        run: |
+          echo "DATABASE_URL=sqlite://database.db" >> .env
+          sqlx database setup --source data/sqlite/migrations
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --features runtime-async-std,data-sqlite,front-terminal
+
+      - name: Collect artifacts
+        run: Compress-Archive -Path zettelkasten.exe,zettelkasten.pdb -DestinationPath release.zip
+        working-directory: target/release/
+ 
+      - name: Upload zettelkasten to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/release.zip
+          tag: ${{ github.ref }}
+          asset_name: Windows.release.zip
+          overwrite: true

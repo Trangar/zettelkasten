@@ -10,6 +10,9 @@ check_terminal:
 run_terminal:
     cargo run --features front-terminal,data-sqlite,runtime-async-std
 
+install_terminal:
+    cargo install --path . --features front-terminal,data-sqlite,runtime-async-std
+
 lint: fmt clippy
 
 clippy:

@@ -146,7 +146,6 @@ impl Search {
         } else if self.selected >= self.results.len() {
             self.selected = self.results.len() - 1;
         }
-        // TODO
         Ok(())
     }
 }

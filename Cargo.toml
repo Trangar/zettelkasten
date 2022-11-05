@@ -1,6 +1,6 @@
 [package]
 name = "zettelkasten"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 
 [features]
@@ -15,11 +15,12 @@ front-terminal = ["zettelkasten-terminal"]
 data-sqlite = ["zettelkasten-sqlite"]
 
 [dependencies]
-zettelkasten-web = { path = "front/web", optional = true }
-zettelkasten-terminal = { path = "front/terminal", optional = true }
-zettelkasten-sqlite = { path = "data/sqlite", optional = true }
-zettelkasten-shared = { path = "shared" }
+dirs = { version = "4.0.0", default-features = false }
 dotenv = { version = "0.15.0", default-features = false }
+zettelkasten-shared = { path = "shared" }
+zettelkasten-sqlite = { path = "data/sqlite", optional = true }
+zettelkasten-terminal = { path = "front/terminal", optional = true }
+zettelkasten-web = { path = "front/web", optional = true }
 
 [workspace]
-members = ["front/web", "front/terminal", "data/sqlite", "shared"]
+members = ["data/sqlite", "front/terminal", "front/web", "shared"]
