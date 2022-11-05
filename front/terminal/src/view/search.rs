@@ -133,7 +133,10 @@ impl Search {
         if self.input.is_empty() {
             self.results.clear();
         } else {
-            let query = storage::SearchOpts { query: &self.input };
+            let query = storage::SearchOpts {
+                query: &self.input,
+                ..Default::default()
+            };
             self.results =
                 zettelkasten_shared::block_on(tui.storage.get_zettels(self.user.id, query))
                     .context(super::DatabaseSnafu)?;

@@ -1,7 +1,4 @@
-use std::{
-    io::{Read, Seek, SeekFrom, Write},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use super::utils::ParsedZettel;
 use crossterm::event::{Event, KeyCode};
@@ -31,8 +28,8 @@ const DISALLOWED_CHARS: &[char] = &['a', 'c', 'e', 'f', 'l', 'q', 's'];
 
 #[derive(Clone)]
 pub struct Zettel {
-    user: Arc<storage::User>,
-    zettel: storage::Zettel,
+    pub(super) user: Arc<storage::User>,
+    pub(super) zettel: storage::Zettel,
 }
 
 impl Zettel {
@@ -129,9 +126,17 @@ impl Zettel {
                         filter.push(c);
                         if filter.len() == zettel.link_char_size {
                             if let Some(link) = zettel.links.get(filter) {
-                                return Ok(Some(Transition::NavigateTo {
-                                    path: link.to_string(),
-                                }));
+                                let zettel = zettelkasten_shared::block_on(
+                                    tui.storage.get_zettel_by_url(self.user.id, link),
+                                )
+                                .context(super::DatabaseSnafu)?
+                                .unwrap_or_else(|| {
+                                    storage::Zettel {
+                                        path: link.to_string(),
+                                        ..Default::default()
+                                    }
+                                });
+                                return Ok(Some(Transition::NavigateTo(zettel)));
                             }
                             render_link_input = None;
                         }
@@ -147,129 +152,12 @@ impl Zettel {
     }
 }
 
-#[allow(dead_code)]
 pub enum Transition {
     Edit,
     Exit,
     Logout,
-    NavigateTo { path: String },
     OpenConfig,
     Search,
     ZettelList,
-}
-
-impl Transition {
-    pub(super) fn into_view_replace(
-        self,
-        parent: &mut Zettel,
-        tui: &mut crate::Tui,
-    ) -> super::Result<Option<super::ViewReplace>> {
-        use super::ViewReplace::*;
-        Ok(match self {
-            Self::Exit => {
-                tui.running = false;
-                None
-            }
-            Self::Logout => Some(Replace(super::login::Login::default().into())),
-            Self::NavigateTo { path } => {
-                if let Some(sys_path) = path.strip_prefix("sys:") {
-                    open_sys_page(sys_path, tui).map(Push)
-                } else {
-                    let zettel = zettelkasten_shared::block_on(
-                        tui.storage.get_zettel_by_url(parent.user.id, &path),
-                    )
-                    .context(super::DatabaseSnafu)?;
-
-                    let zettel = if let Some(zettel) = zettel {
-                        zettelkasten_shared::block_on(
-                            tui.storage
-                                .set_user_last_visited_zettel(parent.user.id, Some(zettel.id)),
-                        )
-                        .context(super::DatabaseSnafu)?;
-                        zettel
-                    } else {
-                        storage::Zettel {
-                            path,
-                            ..Default::default()
-                        }
-                    };
-
-                    Some(Replace(
-                        Zettel {
-                            user: parent.user.clone(),
-                            zettel,
-                        }
-                        .into(),
-                    ))
-                }
-            }
-            Self::OpenConfig => Some(Push(super::config::Config::new(tui).into())),
-            Self::Edit => {
-                if let Some(str) = edit(parent, tui)? {
-                    parent.zettel.body = str;
-                    zettelkasten_shared::block_on(
-                        tui.storage
-                            .update_zettel(parent.user.id, &mut parent.zettel),
-                    )
-                    .context(super::DatabaseSnafu)?;
-                }
-                None
-            }
-            Self::Search => Some(Push(
-                super::search::Search::new(Arc::clone(&parent.user)).into(),
-            )),
-            Self::ZettelList => Some(Push(
-                super::list::List::new(Arc::clone(&parent.user)).into(),
-            )),
-        })
-    }
-}
-
-fn open_sys_page(path: &str, tui: &mut crate::Tui) -> Option<super::ViewLayer> {
-    if path == "config" {
-        Some(super::config::Config::new(tui).into())
-    } else {
-        super::alert(tui.terminal, |f| {
-            f.title("Reserved sys page")
-                .text(format!(
-                    "`sys:` is a reserved prefix, could not navigate to `sys:{path:?}`"
-                ))
-                .action(KeyCode::Enter, "continue")
-        })
-        .expect("Double fault, time to crash to desktop");
-        None
-    }
-}
-
-fn edit(zettel: &Zettel, tui: &mut crate::Tui) -> super::Result<Option<String>> {
-    let editor = if let Some(editor) = &tui.system_config.terminal_editor {
-        editor
-    } else {
-        super::alert(tui.terminal, |cb| {
-            cb.title("Could not edit zettel")
-                .text("No terminal editor configured")
-                .text("Please set one up in sys:config")
-                .action(KeyCode::Enter, "Continue")
-        })?;
-        return Ok(None);
-    };
-    let mut tmp_file = tempfile::Builder::new()
-        .suffix(".md")
-        .tempfile()
-        .context(super::IoSnafu)?;
-    tmp_file
-        .write_all(zettel.zettel.body.as_bytes())
-        .context(super::IoSnafu)?;
-    let _status = std::process::Command::new(editor)
-        .arg(tmp_file.path())
-        .status()
-        .context(super::IoSnafu)?;
-
-    tmp_file.seek(SeekFrom::Start(0)).context(super::IoSnafu)?;
-    let mut result = String::new();
-    tmp_file
-        .read_to_string(&mut result)
-        .context(super::IoSnafu)?;
-    tui.terminal.clear().context(super::IoSnafu)?;
-    Ok(Some(result))
+    NavigateTo(storage::Zettel),
 }

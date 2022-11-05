@@ -1,0 +1,1 @@
+-- we do not care about disabling COLLATE NOCASE

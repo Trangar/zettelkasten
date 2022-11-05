@@ -91,42 +91,63 @@ impl Storage for Connection {
         user: UserId,
         search: SearchOpts<'_>,
     ) -> Result<Vec<ZettelHeader>, Error> {
-        let regex = regex::Regex::new(search.query).context(InvalidRegexSnafu)?;
-
-        // we're using REGEXP here, and sql does not understand that because we need to register it ourselves
-        // therefor we can't use `sqlx::query_as!()` and instead have to do it manually.
-        let query = sqlx::query(
-            "SELECT zettel_id as id, path, body FROM zettel WHERE user_id = ? AND (body REGEXP ? OR path REGEXP ?)",
-        ).bind(user)
-        .bind(search.query)
-        .bind(search.query);
-        let results = query
+        if search.list_all {
+            let results = sqlx::query(
+                "SELECT zettel_id as id, path FROM zettel WHERE user_id = ? ORDER BY path ASC",
+            )
+            .bind(user)
             .fetch_all(&mut *self.conn.lock().await)
             .await
             .context(SqlxSnafu)?;
 
-        Ok(results
-            .into_iter()
-            .map(|row| {
-                let body: String = row.get(2);
-                let highlight_text = if let Some(m) = regex.find(&body) {
-                    let start = if m.start() < 10 { 0 } else { m.start() - 10 };
-                    let end = if m.end() + 10 >= body.len() {
-                        body.len()
-                    } else {
-                        m.end() + 10
-                    };
-                    Some(body[start..end].to_owned())
-                } else {
-                    None
-                };
-                ZettelHeader {
+            Ok(results
+                .into_iter()
+                .map(|row| ZettelHeader {
                     id: row.get(0),
                     path: row.get(1),
-                    highlight_text,
-                }
-            })
-            .collect())
+                    highlight_text: None,
+                })
+                .collect())
+        } else if !search.query.trim().is_empty() {
+            let regex = regex::Regex::new(search.query).context(InvalidRegexSnafu)?;
+
+            // we're using REGEXP here, and sql does not understand that because we need to register it ourselves
+            // therefor we can't use `sqlx::query_as!()` and instead have to do it manually.
+            let query = sqlx::query(
+                "SELECT zettel_id as id, path, body FROM zettel WHERE user_id = ? AND (body REGEXP ? OR path REGEXP ?)",
+            ).bind(user)
+            .bind(search.query)
+            .bind(search.query);
+            let results = query
+                .fetch_all(&mut *self.conn.lock().await)
+                .await
+                .context(SqlxSnafu)?;
+
+            Ok(results
+                .into_iter()
+                .map(|row| {
+                    let body: String = row.get(2);
+                    let highlight_text = if let Some(m) = regex.find(&body) {
+                        let start = if m.start() < 10 { 0 } else { m.start() - 10 };
+                        let end = if m.end() + 10 >= body.len() {
+                            body.len()
+                        } else {
+                            m.end() + 10
+                        };
+                        Some(body[start..end].to_owned())
+                    } else {
+                        None
+                    };
+                    ZettelHeader {
+                        id: row.get(0),
+                        path: row.get(1),
+                        highlight_text,
+                    }
+                })
+                .collect())
+        } else {
+            Err(Error::InvalidSearchOpts)
+        }
     }
 
     async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Zettel, Error> {
@@ -332,7 +353,13 @@ fn test_search_in_path() {
     zettelkasten_shared::block_on(async {
         let (db, user) = test_db().await;
         let result = db
-            .get_zettels(user.id, SearchOpts { query: "home" })
+            .get_zettels(
+                user.id,
+                SearchOpts {
+                    query: "home",
+                    ..Default::default()
+                },
+            )
             .await
             .unwrap();
         assert_eq!(result.len(), 1);
