@@ -1,4 +1,5 @@
 mod config;
+mod list;
 mod login;
 mod register;
 mod search;
@@ -24,6 +25,7 @@ enum ViewLayer {
     Register(register::Register),
     Zettel(zettel::Zettel),
     Search(search::Search),
+    List(list::List),
 }
 
 enum ViewReplace {
@@ -57,6 +59,11 @@ impl From<config::Config> for ViewLayer {
 impl From<search::Search> for ViewLayer {
     fn from(v: search::Search) -> Self {
         ViewLayer::Search(v)
+    }
+}
+impl From<list::List> for ViewLayer {
+    fn from(v: list::List) -> Self {
+        ViewLayer::List(v)
     }
 }
 
@@ -131,6 +138,10 @@ impl View {
                 Some(search::Transition::Pop) => Pop,
                 None => return Ok(()),
             },
+            ViewLayer::List(list) => match list.render(tui)? {
+                Some(list::Transition::Pop) => Pop,
+                None => return Ok(()),
+            },
         };
 
         match next {
@@ -175,8 +186,6 @@ pub enum ViewError {
     ZettelIdNotFound {
         id: i64,
     },
-    #[snafu(display("Not implemented"))]
-    NotImplemented,
     Io {
         source: std::io::Error,
     },

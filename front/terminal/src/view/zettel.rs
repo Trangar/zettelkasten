@@ -80,7 +80,7 @@ impl Zettel {
 
             let action = Paragraph::new(Text {
                 lines: vec![
-                    "A: All pages, C: config, E: edit, F: follow link, L: log out, Q: exit, S: search".into(),
+                    "A: All zettels, C: config, E: edit, F: follow link, L: log out, Q: exit, S: search".into(),
                 ],
             });
             tui.terminal
@@ -106,7 +106,7 @@ impl Zettel {
             let event = crossterm::event::read().context(super::EventSnafu)?;
             if let Event::Key(key_event) = event {
                 match key_event.code {
-                    KeyCode::Char('a') => return Err(super::ViewError::NotImplemented),
+                    KeyCode::Char('a') => return Ok(Some(Transition::ZettelList)),
                     KeyCode::Char('c') => return Ok(Some(Transition::OpenConfig)),
                     KeyCode::Char('e') => return Ok(Some(Transition::Edit)),
                     KeyCode::Char('f') => {
@@ -149,12 +149,13 @@ impl Zettel {
 
 #[allow(dead_code)]
 pub enum Transition {
+    Edit,
     Exit,
     Logout,
     NavigateTo { path: String },
     OpenConfig,
-    Edit,
     Search,
+    ZettelList,
 }
 
 impl Transition {
@@ -216,6 +217,9 @@ impl Transition {
             }
             Self::Search => Some(Push(
                 super::search::Search::new(Arc::clone(&parent.user)).into(),
+            )),
+            Self::ZettelList => Some(Push(
+                super::list::List::new(Arc::clone(&parent.user)).into(),
             )),
         })
     }
