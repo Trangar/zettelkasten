@@ -4,6 +4,11 @@ use async_lock::Mutex;
 use snafu::ResultExt;
 use sqlx::{ConnectOptions as _, Row};
 use std::{str::FromStr, sync::Arc};
+use storage::{
+    BcryptSnafu, ConnectableStorage, Error, InvalidRegexSnafu, JsonSnafu, SearchOpts,
+    SqlxMigrateSnafu, SqlxSnafu, Storage, SystemConfig, User, UserId, Zettel, ZettelHeader,
+    ZettelId,
+};
 use zettelkasten_shared::{
     futures::{future::LocalBoxFuture, FutureExt},
     storage,
@@ -15,44 +20,40 @@ pub struct Connection {
 
 #[allow(unused_variables)]
 #[zettelkasten_shared::async_trait]
-impl storage::Storage for Connection {
-    async fn user_count(&self) -> Result<u64, storage::Error> {
+impl Storage for Connection {
+    async fn user_count(&self) -> Result<u64, Error> {
         let query = sqlx::query!("SELECT COUNT(*) as count FROM users");
         query
             .fetch_one(&mut *self.conn.lock().await)
             .await
             .map(|result| result.count as u64)
-            .context(storage::SqlxSnafu)
+            .context(SqlxSnafu)
     }
 
-    async fn login_single_user(&self) -> Result<storage::User, storage::Error> {
+    async fn login_single_user(&self) -> Result<User, Error> {
         let query = sqlx::query_as!(
-            storage::User,
+            User,
             "SELECT user_id as id, username as name, password, last_visited_zettel FROM users",
         );
         query
             .fetch_one(&mut *self.conn.lock().await)
             .await
-            .context(storage::SqlxSnafu)
+            .context(SqlxSnafu)
     }
 
-    async fn login(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<Option<storage::User>, storage::Error> {
+    async fn login(&self, username: &str, password: &str) -> Result<Option<User>, Error> {
         let query = sqlx::query_as!(
-            storage::User,
+            User,
             "SELECT user_id as id, username as name, password, last_visited_zettel FROM users WHERE username = ?",
             username,
         );
         let user = query
             .fetch_optional(&mut *self.conn.lock().await)
             .await
-            .context(storage::SqlxSnafu)?;
+            .context(SqlxSnafu)?;
 
         if let Some(user) = user {
-            if bcrypt::verify(password, &user.password).context(storage::BcryptSnafu)? {
+            if bcrypt::verify(password, &user.password).context(BcryptSnafu)? {
                 return Ok(Some(user));
             }
         }
@@ -60,60 +61,49 @@ impl storage::Storage for Connection {
         Ok(None)
     }
 
-    async fn register(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<storage::User, storage::Error> {
+    async fn register(&self, username: &str, password: &str) -> Result<User, Error> {
         let mut conn = self.conn.lock().await;
         let query = sqlx::query!(
             "SELECT COUNT(user_id) as count FROM users WHERE username = ?",
             username
         );
-        let user = query
-            .fetch_one(&mut *conn)
-            .await
-            .context(storage::SqlxSnafu)?;
+        let user = query.fetch_one(&mut *conn).await.context(SqlxSnafu)?;
 
         if user.count != 0 {
-            return Err(storage::Error::UserAlreadyExists);
+            return Err(Error::UserAlreadyExists);
         }
 
-        let password =
-            bcrypt::hash(password, bcrypt::DEFAULT_COST).context(storage::BcryptSnafu)?;
+        let password = bcrypt::hash(password, bcrypt::DEFAULT_COST).context(BcryptSnafu)?;
 
         let query = sqlx::query_as!(
-            storage::User,
+            User,
             r#"INSERT INTO users (username, password) VALUES (?, ?) RETURNING user_id as "id!", username as "name!", password as "password!", last_visited_zettel"#,
             username,
             password
         );
-        let user = query
-            .fetch_one(&mut *conn)
-            .await
-            .context(storage::SqlxSnafu)?;
+        let user = query.fetch_one(&mut *conn).await.context(SqlxSnafu)?;
 
         Ok(user)
     }
 
     async fn get_zettels(
         &self,
-        user: storage::UserId,
-        search: storage::SearchOpts<'_>,
-    ) -> Result<Vec<storage::ZettelHeader>, storage::Error> {
-        let regex = regex::Regex::new(search.query).context(storage::InvalidRegexSnafu)?;
+        user: UserId,
+        search: SearchOpts<'_>,
+    ) -> Result<Vec<ZettelHeader>, Error> {
+        let regex = regex::Regex::new(search.query).context(InvalidRegexSnafu)?;
 
         // we're using REGEXP here, and sql does not understand that because we need to register it ourselves
         // therefor we can't use `sqlx::query_as!()` and instead have to do it manually.
         let query = sqlx::query(
-            "SELECT zettel_id as id, path, body FROM zettel WHERE user_id = ? AND (body REGEXP ? OR title REGEXP ?)",
+            "SELECT zettel_id as id, path, body FROM zettel WHERE user_id = ? AND (body REGEXP ? OR path REGEXP ?)",
         ).bind(user)
         .bind(search.query)
         .bind(search.query);
         let results = query
             .fetch_all(&mut *self.conn.lock().await)
             .await
-            .context(storage::SqlxSnafu)?;
+            .context(SqlxSnafu)?;
 
         Ok(results
             .into_iter()
@@ -130,7 +120,7 @@ impl storage::Storage for Connection {
                 } else {
                     None
                 };
-                storage::ZettelHeader {
+                ZettelHeader {
                     id: row.get(0),
                     path: row.get(1),
                     highlight_text,
@@ -139,11 +129,7 @@ impl storage::Storage for Connection {
             .collect())
     }
 
-    async fn get_zettel(
-        &self,
-        user: storage::UserId,
-        id: storage::ZettelId,
-    ) -> Result<storage::Zettel, storage::Error> {
+    async fn get_zettel(&self, user: UserId, id: ZettelId) -> Result<Zettel, Error> {
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
         let result = sqlx::query!(
@@ -153,9 +139,9 @@ impl storage::Storage for Connection {
         )
         .fetch_one(conn)
         .await
-        .context(storage::SqlxSnafu)?;
+        .context(SqlxSnafu)?;
 
-        Ok(storage::Zettel {
+        Ok(Zettel {
             id: result.zettel_id,
             path: result.path,
             body: result.body,
@@ -163,11 +149,7 @@ impl storage::Storage for Connection {
         })
     }
 
-    async fn get_zettel_by_url(
-        &self,
-        user: storage::UserId,
-        path: &str,
-    ) -> Result<Option<storage::Zettel>, storage::Error> {
+    async fn get_zettel_by_url(&self, user: UserId, path: &str) -> Result<Option<Zettel>, Error> {
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
         let result = match sqlx::query!(
@@ -177,13 +159,13 @@ impl storage::Storage for Connection {
         )
         .fetch_optional(conn)
         .await
-        .context(storage::SqlxSnafu)?
+        .context(SqlxSnafu)?
         {
             Some(zettel) => zettel,
             None => return Ok(None),
         };
 
-        Ok(Some(storage::Zettel {
+        Ok(Some(Zettel {
             id: result.zettel_id,
             path: result.path,
             body: result.body,
@@ -191,11 +173,7 @@ impl storage::Storage for Connection {
         }))
     }
 
-    async fn update_zettel(
-        &self,
-        user: storage::UserId,
-        zettel: &mut storage::Zettel,
-    ) -> Result<(), storage::Error> {
+    async fn update_zettel(&self, user: UserId, zettel: &mut Zettel) -> Result<(), Error> {
         let mut conn = self.conn.lock().await;
         if zettel.id == 0 {
             let query = sqlx::query!(
@@ -211,7 +189,7 @@ impl storage::Storage for Connection {
             let id = query
                 .execute(&mut *conn)
                 .await
-                .context(storage::SqlxSnafu)?
+                .context(SqlxSnafu)?
                 .last_insert_rowid();
             zettel.id = id;
             sqlx::query!(
@@ -221,7 +199,7 @@ impl storage::Storage for Connection {
             )
             .execute(&mut *conn)
             .await
-            .context(storage::SqlxSnafu)?;
+            .context(SqlxSnafu)?;
 
             Ok(())
         } else {
@@ -235,16 +213,16 @@ impl storage::Storage for Connection {
             )
             .execute(&mut *conn)
             .await
-            .context(storage::SqlxSnafu)?;
+            .context(SqlxSnafu)?;
             Ok(())
         }
     }
 
     async fn set_user_last_visited_zettel(
         &self,
-        user: storage::UserId,
-        zettel_id: Option<storage::ZettelId>,
-    ) -> Result<(), storage::Error> {
+        user: UserId,
+        zettel_id: Option<ZettelId>,
+    ) -> Result<(), Error> {
         let query = sqlx::query!(
             "UPDATE users SET last_visited_zettel = ? WHERE user_id = ?",
             zettel_id,
@@ -253,13 +231,13 @@ impl storage::Storage for Connection {
         query
             .execute(&mut *self.conn.lock().await)
             .await
-            .context(storage::SqlxSnafu)?;
+            .context(SqlxSnafu)?;
         Ok(())
     }
 
-    async fn update_config(&self, config: &storage::SystemConfig) -> Result<(), storage::Error> {
+    async fn update_config(&self, config: &SystemConfig) -> Result<(), Error> {
         let values = if let serde_json::Value::Object(map) =
-            serde_json::to_value(config).context(storage::JsonSnafu)?
+            serde_json::to_value(config).context(JsonSnafu)?
         {
             map
         } else {
@@ -271,38 +249,38 @@ impl storage::Storage for Connection {
             sqlx::query!("UPDATE config SET value = ? WHERE key = ?", value, key)
                 .execute(&mut *conn)
                 .await
-                .context(storage::SqlxSnafu)?;
+                .context(SqlxSnafu)?;
         }
         Ok(())
     }
 }
 
 impl Connection {
-    async fn load_config(&self) -> Result<storage::SystemConfig, storage::Error> {
+    async fn load_config(&self) -> Result<SystemConfig, Error> {
         // load all the key-value entries from the database
         let result = sqlx::query!("SELECT key, value FROM config")
             .fetch_all(&mut *self.conn.lock().await)
             .await
-            .context(storage::SqlxSnafu)?;
+            .context(SqlxSnafu)?;
 
         // Map them into a `serde_json::Map`
         let map: serde_json::Map<String, serde_json::Value> = result
             .into_iter()
             .map(|o| Ok((o.key, serde_json::from_str(&o.value)?)))
             .collect::<Result<_, _>>()
-            .context(storage::JsonSnafu)?;
+            .context(JsonSnafu)?;
 
         // Now we can deserialize this from a `serde_json::Value::Object(map)`
-        serde_json::from_value(serde_json::Value::Object(map)).context(storage::JsonSnafu)
+        serde_json::from_value(serde_json::Value::Object(map)).context(JsonSnafu)
     }
 }
 
-impl storage::ConnectableStorage for Connection {
+impl ConnectableStorage for Connection {
     type ConnectionArgs = String;
 
     fn connect<'a>(
         connection_args: Self::ConnectionArgs,
-    ) -> LocalBoxFuture<'a, Result<(Self, storage::SystemConfig), storage::Error>> {
+    ) -> LocalBoxFuture<'a, Result<(Self, SystemConfig), Error>> {
         async move {
             println!("Opening {connection_args:?}");
             let mut connection = sqlx::sqlite::SqliteConnectOptions::from_str(&connection_args)
@@ -310,11 +288,11 @@ impl storage::ConnectableStorage for Connection {
                 .create_if_missing(true)
                 .connect()
                 .await
-                .context(storage::SqlxSnafu)?;
+                .context(SqlxSnafu)?;
             sqlx::migrate!()
                 .run(&mut connection)
                 .await
-                .context(storage::SqlxMigrateSnafu)?;
+                .context(SqlxMigrateSnafu)?;
 
             regexp::register(&mut connection).await;
 
@@ -328,4 +306,39 @@ impl storage::ConnectableStorage for Connection {
         }
         .boxed_local()
     }
+}
+
+#[cfg(test)]
+async fn test_db() -> (Connection, User) {
+    let (conn, _config) = Connection::connect(String::from(":memory:"))
+        .await
+        .expect("Could not open db");
+    let user = conn.register("test", "test").await.unwrap();
+    conn.update_zettel(
+        user.id,
+        &mut Zettel {
+            path: "home".to_owned(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    (conn, user)
+}
+
+#[test]
+fn test_search_in_path() {
+    zettelkasten_shared::block_on(async move {
+        let (db, user) = test_db().await;
+        let result = db
+            .get_zettels(user.id, SearchOpts { query: "home" })
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+        let home = &result[0];
+        assert_eq!(home.id, 1);
+        assert_eq!(home.path, "home");
+        assert_eq!(home.highlight_text, None);
+    });
 }
