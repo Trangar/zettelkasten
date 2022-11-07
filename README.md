@@ -42,16 +42,6 @@ Some configs require custom setup instructions
 
 ### `data-sqlite`
 
-To use a sqlite database you need to:
-- add `DATABASE_URL=sqlite://<path>` to `.env`
-  - example: `DATABASE_URL=sqlite://database.db`
-- either:
-  - with [sqlx-cli](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#sqlx-cli):
-    - install `cargo install sqlx-cli --no-default-features --features sqlite,rustls`
-    - run `sqlx database setup --source data/sqlite/migrations`
-  - manually:
-    - create a database file and run all the queries in `data/sqlite/migrations/*.up.sql`
-
 `data-sqlite` will look for, or create, a database in the following places:
 - At the location of one of the following environment variables:
   - `DATABASE_URL`
@@ -61,3 +51,15 @@ To use a sqlite database you need to:
   - Linux: `$XDG_DATA_HOME` or `$HOME/.local/share`
   - Windows: `C:/Users/<user>/AppData/Roaming/`
 - The local directory, if the above fail (`./database.db`)
+
+For local development where you also have a running zettelkasten system, we **highly** recommend setting `DATABASE_URL` to a temp database while working on this project.
+
+To set a temp database you need to:
+- add `DATABASE_URL=sqlite://<path>` to `.env`
+  - example: `DATABASE_URL=sqlite://database.db`
+- either:
+  - with [sqlx-cli](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#sqlx-cli):
+    - install `cargo install sqlx-cli --no-default-features --features sqlite,rustls`
+    - run `sqlx database setup --source data/sqlite/migrations`
+  - manually:
+    - create a database file and run all the queries in `data/sqlite/migrations/*.up.sql`

@@ -25,4 +25,4 @@ features = ["perf", "std"]
 [dependencies.sqlx]
 version = "0.6.2"
 default-features = false
-features = ["sqlite", "migrate", "macros", "json", "chrono"]
+features = ["sqlite", "migrate", "macros", "json", "chrono", 'offline']

@@ -13,6 +13,9 @@ run_terminal:
 install_terminal:
     cargo install --path . --features front-terminal,data-sqlite,runtime-async-std
 
+prepare_sqlite:
+    cd data/sqlite && cargo sqlx prepare -- --features runtime-async-std-offline
+
 lint: fmt clippy
 
 clippy:
