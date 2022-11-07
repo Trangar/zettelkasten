@@ -63,3 +63,15 @@ To set a temp database you need to:
     - run `sqlx database setup --source data/sqlite/migrations`
   - manually:
     - create a database file and run all the queries in `data/sqlite/migrations/*.up.sql`
+
+## Contributing
+
+### Updating schema
+
+When a change in the database schema is made, please follow the following steps to make sure the `sqlx-data.json` is properly updated:
+- sqlite:
+  - make sure an `.env` and updated `database.db` exist in the `data/sqlite` folder
+  - run either:
+    - `just prepare_sqlite` from this folder (not `data/sqlite`)
+    - `cargo sqlx prepare -- --features runtime-async-std` from the `data/sqlite` folder
+  - check in `data/sqlite/sqlx-data.json`
