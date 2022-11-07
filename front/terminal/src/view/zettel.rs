@@ -48,9 +48,20 @@ impl Zettel {
                 body: ENTRY_TEXT.into(),
                 attachments: Vec::new(),
             }),
+            storage,
         )
     }
-    pub(crate) fn new_with_zettel(user: Arc<storage::User>, zettel: storage::Zettel) -> Self {
+
+    pub(crate) fn new_with_zettel(
+        user: Arc<storage::User>,
+        zettel: storage::Zettel,
+        storage: &Arc<dyn storage::Storage>,
+    ) -> Self {
+        if zettel.id != 0 && user.last_visited_zettel != Some(zettel.id) {
+            let _ = zettelkasten_shared::block_on(
+                storage.set_user_last_visited_zettel(user.id, Some(zettel.id)),
+            );
+        }
         Self { user, zettel }
     }
 
