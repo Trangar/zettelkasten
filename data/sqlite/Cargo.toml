@@ -1,6 +1,6 @@
 [package]
 name = "zettelkasten-sqlite"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [features]
@@ -15,7 +15,7 @@ bcrypt = { version = "0.13.0", default-features = false, features = ["alloc"] }
 libsqlite3-sys = { version = "=0.24.1", default-features = false }              # version must match sqlx
 serde_json = { version = "1.0.85", default-features = false }
 snafu = { version = "0.7.2", default-features = false }
-zettelkasten-shared = { version = "0.1.0", path = "../../shared" }
+zettelkasten-shared = { version = "0.1.1", path = "../../shared" }
 
 [dependencies.regex]
 version = "1.6.0"

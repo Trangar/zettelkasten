@@ -1843,7 +1843,7 @@ checksum = "f40009d85759725a34da6d89a94e63d7bdc50a862acf0dbc7c8e488f1edcb6f5"
 
 [[package]]
 name = "zettelkasten"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dirs",
  "dotenv",
@@ -1855,7 +1855,7 @@ dependencies = [
 
 [[package]]
 name = "zettelkasten-shared"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1871,7 +1871,7 @@ dependencies = [
 
 [[package]]
 name = "zettelkasten-sqlite"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-lock",
  "bcrypt",
@@ -1885,7 +1885,7 @@ dependencies = [
 
 [[package]]
 name = "zettelkasten-terminal"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "crossterm",
  "lazy_static",
