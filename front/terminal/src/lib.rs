@@ -72,6 +72,7 @@ impl Front for Tui<'_> {
                 }
             }
         }
+        let _ = tui.terminal.clear();
     }
 }
 
