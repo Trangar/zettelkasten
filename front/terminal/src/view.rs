@@ -130,6 +130,7 @@ impl View {
                     )
                     .into(),
                 ),
+                Some(zettel::Transition::SysPage(page)) => Push(page),
                 None => {
                     return Ok(());
                 }
@@ -218,6 +219,10 @@ pub enum ViewError {
     },
     Io {
         source: std::io::Error,
+    },
+    #[snafu(display("Unknown system page {page:?}. `sys:` is a reserved prefix"))]
+    UnknownSysPage {
+        page: String,
     },
 }
 
