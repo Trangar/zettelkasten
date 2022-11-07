@@ -65,7 +65,7 @@ impl Zettel {
         Self { user, zettel }
     }
 
-    pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> super::Result<Option<Transition>> {
+    pub(super) fn render(&mut self, tui: &mut crate::Tui) -> super::Result<Option<Transition>> {
         let mut render_link_input: Option<String> = None;
         let mut rendered_zettel = None;
         loop {
@@ -137,17 +137,22 @@ impl Zettel {
                         filter.push(c);
                         if filter.len() == zettel.link_char_size {
                             if let Some(link) = zettel.links.get(filter) {
-                                let zettel = zettelkasten_shared::block_on(
-                                    tui.storage.get_zettel_by_url(self.user.id, link),
-                                )
-                                .context(super::DatabaseSnafu)?
-                                .unwrap_or_else(|| {
-                                    storage::Zettel {
+                                let transition = if let Some(sys_page) =
+                                    super::utils::try_get_sys_page(tui, link)?
+                                {
+                                    Transition::SysPage(sys_page)
+                                } else {
+                                    let zettel = zettelkasten_shared::block_on(
+                                        tui.storage.get_zettel_by_url(self.user.id, link),
+                                    )
+                                    .context(super::DatabaseSnafu)?
+                                    .unwrap_or_else(|| storage::Zettel {
                                         path: link.to_string(),
                                         ..Default::default()
-                                    }
-                                });
-                                return Ok(Some(Transition::NavigateTo(zettel)));
+                                    });
+                                    Transition::NavigateTo(zettel)
+                                };
+                                return Ok(Some(transition));
                             }
                             render_link_input = None;
                         }
@@ -163,7 +168,7 @@ impl Zettel {
     }
 }
 
-pub enum Transition {
+pub(super) enum Transition {
     Edit,
     Exit,
     Logout,
@@ -171,4 +176,5 @@ pub enum Transition {
     Search,
     ZettelList,
     NavigateTo(storage::Zettel),
+    SysPage(super::ViewLayer),
 }

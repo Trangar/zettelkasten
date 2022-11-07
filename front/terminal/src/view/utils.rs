@@ -206,3 +206,19 @@ pub fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> super::Result<Opt
     tui.terminal.clear().context(super::IoSnafu)?;
     Ok(Some(result))
 }
+
+pub(super) fn try_get_sys_page(
+    tui: &mut crate::Tui,
+    link: &str,
+) -> super::Result<Option<super::ViewLayer>> {
+    if let Some(page) = link.strip_prefix("sys:") {
+        match page {
+            "config" => Ok(Some(super::config::Config::new(tui).into())),
+            _ => Err(super::ViewError::UnknownSysPage {
+                page: page.to_string(),
+            }),
+        }
+    } else {
+        Ok(None)
+    }
+}
