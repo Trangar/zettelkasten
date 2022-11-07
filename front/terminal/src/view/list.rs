@@ -128,6 +128,7 @@ impl List {
                                     super::zettel::Zettel::new_with_zettel(
                                         Arc::clone(&self.user),
                                         zettel,
+                                        tui.storage,
                                     ),
                                 )))
                             }

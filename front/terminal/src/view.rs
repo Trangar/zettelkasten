@@ -123,7 +123,12 @@ impl View {
                     Push(list::List::new(Arc::clone(&zettel.user), tui)?.into())
                 }
                 Some(zettel::Transition::NavigateTo(new_zettel)) => Replace(
-                    zettel::Zettel::new_with_zettel(Arc::clone(&zettel.user), new_zettel).into(),
+                    zettel::Zettel::new_with_zettel(
+                        Arc::clone(&zettel.user),
+                        new_zettel,
+                        tui.storage,
+                    )
+                    .into(),
                 ),
                 None => {
                     return Ok(());
