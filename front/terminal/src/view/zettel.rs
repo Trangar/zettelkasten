@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::utils::ParsedZettel;
+use super::utils::{ParsedZettel, RenderStyle};
 use crossterm::event::{Event, KeyCode};
 use snafu::ResultExt;
 use tui::{
@@ -58,9 +58,9 @@ impl Zettel {
         storage: &Arc<dyn storage::Storage>,
     ) -> Self {
         if zettel.id != 0 && user.last_visited_zettel != Some(zettel.id) {
-            let _ = zettelkasten_shared::block_on(
+            drop(zettelkasten_shared::block_on(
                 storage.set_user_last_visited_zettel(user.id, Some(zettel.id)),
-            );
+            ));
         }
         Self { user, zettel }
     }
@@ -75,7 +75,7 @@ impl Zettel {
                     &self.zettel,
                     DISALLOWED_CHARS,
                     render_link_input.is_some(),
-                    Default::default(),
+                    RenderStyle::default(),
                 )
             });
 
@@ -147,7 +147,7 @@ impl Zettel {
                                     )
                                     .context(super::DatabaseSnafu)?
                                     .unwrap_or_else(|| storage::Zettel {
-                                        path: link.to_string(),
+                                        path: (*link).to_string(),
                                         ..Default::default()
                                     });
                                     Transition::NavigateTo(zettel)

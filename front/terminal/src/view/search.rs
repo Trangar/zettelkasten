@@ -121,7 +121,7 @@ impl Search {
                     }
                     KeyCode::Down => {
                         if self.selected + 1 < self.results.len() {
-                            self.selected += 1
+                            self.selected += 1;
                         }
                     }
                     _ => {}

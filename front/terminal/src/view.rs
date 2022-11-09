@@ -40,9 +40,19 @@ impl From<ViewLayer> for View {
     }
 }
 
+impl From<config::Config> for ViewLayer {
+    fn from(v: config::Config) -> Self {
+        ViewLayer::Config(v)
+    }
+}
 impl From<login::Login> for ViewLayer {
     fn from(v: login::Login) -> Self {
         ViewLayer::Login(v)
+    }
+}
+impl From<register::Register> for ViewLayer {
+    fn from(v: register::Register) -> Self {
+        ViewLayer::Register(v)
     }
 }
 
@@ -51,11 +61,7 @@ impl From<zettel::Zettel> for ViewLayer {
         ViewLayer::Zettel(v)
     }
 }
-impl From<config::Config> for ViewLayer {
-    fn from(v: config::Config) -> Self {
-        ViewLayer::Config(v)
-    }
-}
+
 impl From<search::Search> for ViewLayer {
     fn from(v: search::Search) -> Self {
         ViewLayer::Search(v)
@@ -69,22 +75,26 @@ impl From<list::List> for ViewLayer {
 
 impl View {
     pub fn new(system_config: &storage::SystemConfig, storage: &Arc<dyn storage::Storage>) -> Self {
-        let layer = match system_config.user_mode {
-            storage::UserMode::SingleUserAutoLogin => {
-                match zettelkasten_shared::block_on(storage.login_single_user()) {
-                    // Successfully logged in
-                    Ok(user) => zettel::Zettel::new_with_user(storage, Arc::new(user)).into(),
-                    // Failed to log in, show the login view and the error
-                    Err(source) => login::Login {
-                        error: Some(login::LoginError::Storage { source }),
-                        ..Default::default()
+        let layer = if let Ok(0) = zettelkasten_shared::block_on(storage.user_count()) {
+            register::Register::default().into()
+        } else {
+            match system_config.user_mode {
+                storage::UserMode::SingleUserAutoLogin => {
+                    match zettelkasten_shared::block_on(storage.login_single_user()) {
+                        // Successfully logged in
+                        Ok(user) => zettel::Zettel::new_with_user(storage, Arc::new(user)).into(),
+                        // Failed to log in, show the login view and the error
+                        Err(source) => login::Login {
+                            error: Some(login::LoginError::Storage { source }),
+                            ..Default::default()
+                        }
+                        .into(),
                     }
-                    .into(),
                 }
-            }
-            storage::UserMode::MultiUser | storage::UserMode::SingleUserManualLogin => {
-                // show the login view
-                login::Login::default().into()
+                storage::UserMode::MultiUser | storage::UserMode::SingleUserManualLogin => {
+                    // show the login view
+                    login::Login::default().into()
+                }
             }
         };
         Self {
@@ -140,9 +150,7 @@ impl View {
                     tui.running = false;
                     return Ok(());
                 }
-                Some(login::Transition::Register) => {
-                    Replace(ViewLayer::Register(Default::default()))
-                }
+                Some(login::Transition::Register) => Replace(register::Register::default().into()),
                 Some(login::Transition::Login { user }) => {
                     Replace(zettel::Zettel::new_with_user(tui.storage, Arc::new(user)).into())
                 }
@@ -156,7 +164,7 @@ impl View {
                 Some(register::Transition::Registered { user }) => {
                     Replace(zettel::Zettel::new_with_user(tui.storage, Arc::new(user)).into())
                 }
-                Some(register::Transition::Login) => Replace(ViewLayer::Login(Default::default())),
+                Some(register::Transition::Login) => Replace(login::Login::default().into()),
                 None => return Ok(()),
             },
             ViewLayer::Config(config) => match config.render(tui)? {
@@ -177,7 +185,7 @@ impl View {
 
         match next {
             Pop => {
-                let _ = self.layers.pop();
+                drop(self.layers.pop());
                 assert!(!self.layers.is_empty());
             }
             Push(layer) => {
@@ -192,11 +200,11 @@ impl View {
     }
 }
 
-pub type Result<T = ()> = std::result::Result<T, ViewError>;
+pub type Result<T = ()> = std::result::Result<T, Error>;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
-pub enum ViewError {
+pub enum Error {
     #[snafu(display("Could not retrieve the terminal size"))]
     TerminalSize {
         source: std::io::Error,
@@ -228,11 +236,11 @@ pub enum ViewError {
 
 pub fn alert<F>(terminal: &mut super::Terminal, cb: F) -> Result<KeyCode>
 where
-    F: Fn(ViewBuilder) -> ViewBuilder,
+    F: Fn(AlertBuilder) -> AlertBuilder,
 {
     loop {
         let size = terminal.size().context(TerminalSizeSnafu)?;
-        let builder = ViewBuilder::default();
+        let builder = AlertBuilder::default();
         let builder = cb(builder);
         terminal
             .draw(|f| {
@@ -265,7 +273,7 @@ where
                 }
 
                 let paragraph = Paragraph::new(Text { lines }).block(block);
-                f.render_widget(paragraph, size)
+                f.render_widget(paragraph, size);
             })
             .context(RenderFrameSnafu)?;
 
@@ -279,7 +287,7 @@ where
 }
 
 #[derive(Default)]
-pub struct ViewBuilder {
+pub struct AlertBuilder {
     width: u16,
     height: u16,
     title: Option<Cow<'static, str>>,
@@ -287,30 +295,32 @@ pub struct ViewBuilder {
     actions: Vec<(KeyCode, Cow<'static, str>)>,
 }
 
-impl ViewBuilder {
+impl AlertBuilder {
     pub fn title(mut self, text: impl Into<Cow<'static, str>>) -> Self {
         self.title = Some(text.into());
         self
     }
     pub fn text(mut self, text: impl Into<Cow<'static, str>>) -> Self {
         let text = text.into();
-        self.width = self.width.max(text.chars().count() as u16 + 2);
+        self.width = self
+            .width
+            .max(u16::try_from(text.chars().count()).unwrap() + 2);
         self.height += 1;
         self.lines.push(text);
         self
     }
     pub fn action(mut self, code: KeyCode, text: impl Into<Cow<'static, str>>) -> Self {
         let text = text.into();
-        let mut line_width = text.chars().count() as u16
+        let mut line_width = u16::try_from(text.chars().count()).unwrap()
             + match code {
                 KeyCode::Char(_) => 3, // 'c: '
                 KeyCode::Enter => 9,   // '<return> ',
                 _ => panic!("Unknown keycode character length: {code:?}"),
             };
-        if !self.actions.is_empty() {
-            line_width += 2; // ', '
-        } else {
+        if self.actions.is_empty() {
             self.height += 1;
+        } else {
+            line_width += 2; // ', '
         }
         self.width = self.width.max(line_width);
         self.actions.push((code, text));
