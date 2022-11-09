@@ -42,6 +42,7 @@ pub struct ParsedZettel<'a> {
 }
 
 impl<'a> ParsedZettel<'a> {
+    #[allow(clippy::needless_pass_by_value, clippy::similar_names)]
     pub fn parse(
         zettel: &'a storage::Zettel,
         disallowed: &[char],
@@ -90,7 +91,7 @@ impl<'a> ParsedZettel<'a> {
                 } else {
                     parts.push(Span::styled(&line[text.range()], style.link_style));
                 }
-                let end = maybe_link.map(|l| l.end()).unwrap_or_else(|| text.end());
+                let end = maybe_link.map_or_else(|| text.end(), |l| l.end());
                 line = &line[end..];
 
                 let url = if let Some(url) = maybe_link {
@@ -214,7 +215,7 @@ pub(super) fn try_get_sys_page(
     if let Some(page) = link.strip_prefix("sys:") {
         match page {
             "config" => Ok(Some(super::config::Config::new(tui).into())),
-            _ => Err(super::ViewError::UnknownSysPage {
+            _ => Err(super::Error::UnknownSysPage {
                 page: page.to_string(),
             }),
         }

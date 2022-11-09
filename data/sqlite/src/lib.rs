@@ -256,11 +256,7 @@ impl Storage for Connection {
     }
 
     async fn update_config(&self, config: &SystemConfig) -> Result<(), Error> {
-        let values = if let serde_json::Value::Object(map) =
-            serde_json::to_value(config).context(JsonSnafu)?
-        {
-            map
-        } else {
+        let serde_json::Value::Object(values) = serde_json::to_value(config).context(JsonSnafu)? else {
             panic!("SystemConfig did not serialize to an object")
         };
 

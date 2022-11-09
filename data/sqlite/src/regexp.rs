@@ -81,25 +81,17 @@ unsafe extern "C" fn sqlite3_regexp_func(
     }
 
     // arg0: Regex
-    let regex = if let Some(regex) = get_regex_from_arg(ctx, *args.offset(0), 0) {
-        regex
-    } else {
+    let Some(regex) = get_regex_from_arg(ctx, *args.offset(0), 0) else {
         return;
     };
 
     // arg1: value
-    let value = if let Some(text) = get_text_from_arg(ctx, *args.offset(1)) {
-        text
-    } else {
+    let Some(value) = get_text_from_arg(ctx, *args.offset(1)) else {
         return;
     };
 
     // if the regex matches the value, set the result int as 1, else as 0
-    if regex.is_match(value) {
-        ffi::sqlite3_result_int(ctx, 1);
-    } else {
-        ffi::sqlite3_result_int(ctx, 0);
-    }
+    ffi::sqlite3_result_int(ctx, i32::from(regex.is_match(value)));
 }
 
 /// Get the regex from the given `arg` at the given `index`.

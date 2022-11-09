@@ -1,3 +1,6 @@
+#![deny(clippy::perf)]
+#![warn(clippy::pedantic)]
+
 mod view;
 
 use crossterm::{
@@ -22,13 +25,12 @@ pub struct Tui<'a> {
 
 impl Tui<'_> {
     pub(crate) fn can_register(&self) -> view::Result<bool> {
-        match self.system_config.user_mode {
-            storage::UserMode::MultiUser => Ok(true),
-            _ => {
-                let user_count = zettelkasten_shared::block_on(self.storage.user_count())
-                    .context(view::DatabaseSnafu)?;
-                Ok(user_count == 0)
-            }
+        if let storage::UserMode::MultiUser = self.system_config.user_mode {
+            Ok(true)
+        } else {
+            let user_count = zettelkasten_shared::block_on(self.storage.user_count())
+                .context(view::DatabaseSnafu)?;
+            Ok(user_count == 0)
         }
     }
 }
@@ -57,33 +59,31 @@ impl Front for Tui<'_> {
         };
 
         while tui.running {
-            if let Err(e) = view.render(&mut tui) {
-                let keycode = view::alert(tui.terminal, |f| {
-                    f.title("Could not render page")
-                        .text(e.to_string())
-                        .action(KeyCode::Char('q'), "quit")
-                        .action(KeyCode::Enter, "continue")
-                })
-                .expect("Double fault, time to crash to desktop");
-                match keycode {
-                    KeyCode::Char('q') => return,
-                    KeyCode::Char('c') => {}
-                    _ => unreachable!(),
-                }
+            let Err(e) = view.render(&mut tui) else { continue };
+            let keycode = view::alert(tui.terminal, |f| {
+                f.title("Could not render page")
+                    .text(e.to_string())
+                    .action(KeyCode::Char('q'), "quit")
+                    .action(KeyCode::Enter, "continue")
+            })
+            .expect("Double fault, time to crash to desktop");
+
+            if keycode == KeyCode::Char('q') {
+                tui.running = false;
             }
         }
-        let _ = tui.terminal.clear();
+        drop(tui.terminal.clear());
     }
 }
 
 impl Drop for Tui<'_> {
     fn drop(&mut self) {
-        let _ = disable_raw_mode();
+        drop(disable_raw_mode());
 
         if !std::thread::panicking() {
-            let _ = self.terminal.backend_mut().execute(LeaveAlternateScreen);
+            drop(self.terminal.backend_mut().execute(LeaveAlternateScreen));
         }
-        let _ = self.terminal.backend_mut().execute(DisableMouseCapture);
-        let _ = self.terminal.show_cursor();
+        drop(self.terminal.backend_mut().execute(DisableMouseCapture));
+        drop(self.terminal.show_cursor());
     }
 }
