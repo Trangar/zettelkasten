@@ -136,7 +136,8 @@ impl Zettel {
                     if let KeyCode::Char(c) = key_event.code {
                         filter.push(c);
                         if filter.len() == zettel.link_char_size {
-                            if let Some(link) = zettel.links.get(filter) {
+                            let filter_as_naming = super::utils::Naming::from(filter.as_str());
+                            if let Some(link) = zettel.links.get(&filter_as_naming) {
                                 let transition = if let Some(sys_page) =
                                     super::utils::try_get_sys_page(tui, link)?
                                 {

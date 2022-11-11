@@ -12,7 +12,7 @@ use crossterm::{
 use snafu::ResultExt;
 use std::{io::Stdout, sync::Arc};
 use tui::backend::CrosstermBackend;
-use zettelkasten_shared::{storage, Front};
+use zettelkasten_shared::{async_trait, storage, Front};
 
 pub(crate) type Terminal = tui::Terminal<CrosstermBackend<Stdout>>;
 
@@ -35,44 +35,48 @@ impl Tui<'_> {
     }
 }
 
+#[async_trait]
 impl Front for Tui<'_> {
     type Config = ();
 
-    fn run(
+    async fn run(
         _: Self::Config,
         mut system_config: storage::SystemConfig,
         storage: Arc<dyn storage::Storage>,
     ) {
-        enable_raw_mode().expect("Could not enable raw mode");
-        let mut stdout = std::io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
-            .expect("Could not enable alternate screen and mouse capture");
+        zettelkasten_shared::spawn_blocking(move || {
+            enable_raw_mode().expect("Could not enable raw mode");
+            let mut stdout = std::io::stdout();
+            execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+                .expect("Could not enable alternate screen and mouse capture");
 
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend).expect("Could not instantiate the terminal");
-        let mut view = view::View::new(&system_config, &storage);
-        let mut tui = Tui {
-            terminal: &mut terminal,
-            system_config: &mut system_config,
-            storage: &storage,
-            running: true,
-        };
+            let backend = CrosstermBackend::new(stdout);
+            let mut terminal = Terminal::new(backend).expect("Could not instantiate the terminal");
+            let mut view = view::View::new(&system_config, &storage);
+            let mut tui = Tui {
+                terminal: &mut terminal,
+                system_config: &mut system_config,
+                storage: &storage,
+                running: true,
+            };
 
-        while tui.running {
-            let Err(e) = view.render(&mut tui) else { continue };
-            let keycode = view::alert(tui.terminal, |f| {
-                f.title("Could not render page")
-                    .text(e.to_string())
-                    .action(KeyCode::Char('q'), "quit")
-                    .action(KeyCode::Enter, "continue")
-            })
-            .expect("Double fault, time to crash to desktop");
+            while tui.running {
+                let Err(e) = view.render(&mut tui) else { continue };
+                let keycode = view::alert(tui.terminal, |f| {
+                    f.title("Could not render page")
+                        .text(e.to_string())
+                        .action(KeyCode::Char('q'), "quit")
+                        .action(KeyCode::Enter, "continue")
+                })
+                .expect("Double fault, time to crash to desktop");
 
-            if keycode == KeyCode::Char('q') {
-                tui.running = false;
+                if keycode == KeyCode::Char('q') {
+                    tui.running = false;
+                }
             }
-        }
-        drop(tui.terminal.clear());
+            drop(tui.terminal.clear());
+        })
+        .await;
     }
 }
 

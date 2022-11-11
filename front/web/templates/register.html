@@ -1,0 +1,23 @@
+{% extends "_layout.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block head %}
+<style>
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Register</h1>
+{% match error %}
+{% when Some(error) %}{{ error }}
+{% when None %}
+{% endmatch %}
+<form action="/sys:register" method="post">
+    Username: <input type="text" name="username" value="{{ username }}" /><br />
+    Password: <input type="password" name="password" /><br />
+    Repeat: <input type="password" name="repeat_password" /><br />
+    <input type="submit" value="Register" />
+</form>
+
+{% endblock %}

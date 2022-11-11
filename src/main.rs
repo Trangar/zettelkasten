@@ -4,12 +4,27 @@ use zettelkasten_shared::{
     Front,
 };
 
+#[cfg(feature = "front-web")]
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
 #[allow(clippy::redundant_clone)]
 fn main() {
     zettelkasten_shared::block_on(async {
         let (connection, system_config) = data_policy_should_exist_exactly_once().await;
-        #[cfg(feature = "front-terminal")]
-        zettelkasten_terminal::Tui::run((), system_config.clone(), Arc::clone(&connection));
+        let futures = [
+            #[cfg(feature = "front-web")]
+            zettelkasten_web::Web::run(
+                zettelkasten_web::ServerConfig {
+                    bind_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8080)),
+                    session_secret: None,
+                },
+                system_config.clone(),
+                Arc::clone(&connection),
+            ),
+            #[cfg(feature = "front-terminal")]
+            zettelkasten_terminal::Tui::run((), system_config.clone(), Arc::clone(&connection)),
+        ];
+        zettelkasten_shared::futures::future::join_all(futures).await;
     });
 }
 

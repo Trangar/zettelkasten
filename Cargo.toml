@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 runtime-async-std = [
     "zettelkasten-sqlite?/runtime-async-std",
+    "zettelkasten-web?/runtime-async-std",
     "zettelkasten-shared/runtime-async-std",
 ]
 
