@@ -1,5 +1,41 @@
 {
   "db": "SQLite",
+  "0303d30d5c0752c2f61299d38b7b2db7b747536c9713c22c66d513a04328e361": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int64"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_visited_zettel",
+          "ordinal": 3,
+          "type_info": "Int64"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        true
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "SELECT user_id as id, username as name, password, last_visited_zettel FROM users WHERE user_id = ?"
+  },
   "26b414106803d4de7f1ebdf7f2e7c8d467da46cbbfe46f02c8e9dfd90832cc3b": {
     "describe": {
       "columns": [],
