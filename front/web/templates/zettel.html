@@ -3,11 +3,15 @@
 {% block title %}{{ path }}{% endblock %}
 
 {% block head %}
-<style>
-</style>
+<script type="text/javascript" src="static/script.js"></script>
 {% endblock %}
 
 {% block content %}
 {{ body|render|safe }}
+<p>
+    <bold>
+        A: All zettels, C: config, E: edit, F: follow link, L: log out, S: search
+    </bold>
+</p>
 
 {% endblock %}

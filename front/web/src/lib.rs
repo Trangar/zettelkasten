@@ -41,6 +41,17 @@ impl zettelkasten_shared::Front for Web {
                 warning.as_bytes()
             }),
         ));
+        if std::path::Path::new("static").exists() {
+            app.at("/static")
+                .serve_dir("static")
+                .expect("Could not serve static dir");
+        } else if cfg!(debug_assertions) && std::path::Path::new("front/web/static").exists() {
+            app.at("/static")
+                .serve_dir("front/web/static")
+                .expect("Could not serve static dir");
+        } else {
+            panic!("`static` directory not found");
+        }
         app.at("/").get(routes::get_index);
         app.at("/sys:login")
             .get(routes::login::get)
