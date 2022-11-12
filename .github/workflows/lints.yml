@@ -31,7 +31,7 @@ jobs:
       matrix:
         data: [sqlite, postgres]
         runtime: [async-std]
-        front: [terminal]
+        front: [terminal, web]
 
     steps:
       - name: Checkout sources
