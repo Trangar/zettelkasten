@@ -3,7 +3,7 @@ use snafu::ResultExt;
 use tide::{Redirect, Request, Result};
 
 pub async fn get(req: Request<Web>) -> Result {
-    crate::req::render_template(Login {
+    crate::render_template(Login {
         can_register: req.state().can_register().await,
         username: "",
         error: None,
@@ -20,15 +20,15 @@ pub async fn post(mut req: Request<Web>) -> Result {
         .context(crate::StorageSnafu)
     {
         Ok(Some(user)) => {
-            let user = crate::req::User::new_session(user, req.session_mut());
+            let user = crate::User::new_session(user, req.session_mut());
             Ok(user.redirect_to_latest_zettel(&req.state().storage).await)
         }
-        Ok(None) => crate::req::render_template(Login {
+        Ok(None) => crate::render_template(Login {
             username: &login.username,
             error: Some(crate::Error::UserNotFound),
             can_register: req.state().can_register().await,
         }),
-        Err(e) => crate::req::render_template(Login {
+        Err(e) => crate::render_template(Login {
             username: &login.username,
             error: Some(e),
             can_register: req.state().can_register().await,

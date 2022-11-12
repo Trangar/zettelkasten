@@ -3,14 +3,14 @@ pub mod register;
 pub mod zettel;
 
 use super::Web;
-use crate::req::User;
+use crate::User;
 use tide::{Redirect, Request, Result};
 
 pub async fn get_index(req: Request<Web>) -> Result {
     match User::from_req(&req).await {
         Ok(user) => {
             let zettel = user.load_last_visited_zettel(&req.state().storage).await;
-            crate::req::render_template(zettel::Zettel {
+            crate::render_template(zettel::Zettel {
                 user: &user,
                 body: &zettel.body,
                 path: &zettel.path,

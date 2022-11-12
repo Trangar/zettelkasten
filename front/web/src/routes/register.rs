@@ -3,19 +3,19 @@ use snafu::ResultExt;
 use tide::{Request, Result};
 
 pub async fn get(_req: Request<Web>) -> Result {
-    crate::req::render_template(Register::default())
+    crate::render_template(Register::default())
 }
 
 pub async fn post(mut req: Request<Web>) -> Result {
     let register = req.body_form::<PostRegister>().await?;
     if !req.state().can_register().await {
-        return crate::req::render_template(Register {
+        return crate::render_template(Register {
             error: Some(crate::Error::CannotRegister),
             username: "",
         });
     }
     if register.password != register.repeat_password {
-        return crate::req::render_template(Register {
+        return crate::render_template(Register {
             error: Some(crate::Error::PasswordMismatch),
             username: &register.username,
         });
@@ -28,10 +28,10 @@ pub async fn post(mut req: Request<Web>) -> Result {
         .context(crate::StorageSnafu)
     {
         Ok(user) => {
-            let user = crate::req::User::new_session(user, req.session_mut());
+            let user = crate::User::new_session(user, req.session_mut());
             Ok(user.redirect_to_latest_zettel(&req.state().storage).await)
         }
-        Err(e) => crate::req::render_template(Register {
+        Err(e) => crate::render_template(Register {
             error: Some(e),
             username: &register.username,
         }),

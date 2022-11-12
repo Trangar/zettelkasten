@@ -1,6 +1,9 @@
-mod req;
 mod routes;
+mod user;
 
+pub(crate) use user::User;
+
+use snafu::ResultExt;
 use std::{net::SocketAddr, sync::Arc};
 use tide::{log::warn, sessions::SessionMiddleware};
 use zettelkasten_shared::{async_trait, storage};
@@ -33,7 +36,7 @@ impl zettelkasten_shared::Front for Web {
             storage,
         });
         app.with(SessionMiddleware::new(
-            tide::sessions::MemoryStore::new(),
+            tide::sessions::CookieStore::new(),
             config.session_secret.as_deref().unwrap_or_else(|| {
                 let warning =
                     "Missing session secret. This should be set in a production environment.";
@@ -94,3 +97,19 @@ pub enum Error {
 }
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
+
+pub(crate) fn render_template(tmpl: impl askama::Template) -> tide::Result {
+    let str = tmpl.render().context(crate::AskamaSnafu)?;
+    let mut response = tide::Response::new(200);
+    response.set_content_type("text/HTML");
+    response.set_body(str);
+    Ok(response)
+}
+
+pub(crate) fn default_zettel() -> storage::Zettel {
+    storage::Zettel {
+        path: "/home".to_string(),
+        body: r#"Welcome to zettelkasten\n\n**bold**"#.to_string(),
+        ..Default::default()
+    }
+}
