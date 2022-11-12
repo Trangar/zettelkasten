@@ -24,6 +24,7 @@ pub enum Cursor {
     RepeatPassword,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Snafu)]
 pub enum RegisterError {
     #[snafu(display("Storage error"))]

@@ -247,6 +247,7 @@ impl Storage for Connection {
 
     async fn update_config(&self, config: &SystemConfig) -> Result<(), Error> {
         let mut conn = self.conn.acquire().await.context(SqlxSnafu)?;
+
         let serde_json::Value::Object(values) = serde_json::to_value(config).context(JsonSnafu)? else {
             panic!("SystemConfig did not serialize to an object")
         };

@@ -22,6 +22,7 @@ pub enum Cursor {
     Password,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Snafu)]
 pub enum LoginError {
     #[snafu(display("Storage error: {source:?}"))]
