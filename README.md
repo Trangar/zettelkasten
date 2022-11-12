@@ -69,6 +69,25 @@ To set a temp database you need to:
   - manually:
     - create a database file and run all the queries in `data/sqlite/migrations/*.up.sql`
 
+### `data-postgres`
+
+`data-postgres` will look for a database connection string in one of the following environment variables:
+- `DATABASE_URL`
+- `ZETTELKASTEN_DATABASE_URL`
+
+If such an environment variable is not set, postgres will not be able to run.
+
+For local development where you also have a running zettelkasten system, we **highly** recommend setting `DATABASE_URL` to a temp database while working on this project.
+
+To set a temp database you need to:
+- add `DATABASE_URL=postgres://<path>` to `.env`
+- either:
+  - with [sqlx-cli](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#sqlx-cli):
+    - install `cargo install sqlx-cli --no-default-features --features postgres,rustls`
+    - run `sqlx database setup --source data/postgres/migrations`
+  - manually:
+    - create a database file and run all the queries in `data/postgres/migrations/*.up.sql`
+
 ## Contributing
 
 ### Updating schema
