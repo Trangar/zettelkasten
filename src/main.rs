@@ -34,3 +34,18 @@ async fn data_policy_should_exist_exactly_once(
         .expect("Could not open database");
     (Arc::new(connection), config)
 }
+
+#[cfg(feature = "data-postgres")]
+async fn data_policy_should_exist_exactly_once(
+) -> (Arc<dyn storage::Storage>, storage::SystemConfig) {
+    let _ = dotenv::dotenv();
+
+    let connection_string = std::env::var("DATABASE_URL")
+        .or_else(|_| std::env::var("ZETTELKASTEN_DATABASE_URL"))
+        .expect("Postgres database url not set. Please set either `DATABASE_URL` or `ZETTELKASTEN_DATABASE_URL`");
+
+    let (connection, config) = zettelkasten_postgres::Connection::connect(connection_string)
+        .await
+        .expect("Could not open database");
+    (Arc::new(connection), config)
+}
