@@ -29,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        data: [sqlite, postgres]
         runtime: [async-std]
         front: [terminal]
 
@@ -48,4 +49,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --features runtime-${{ matrix.runtime }},data-sqlite,front-${{ matrix.front }} -- -D warnings
+          args: --features runtime-${{ matrix.runtime }},data-${{ matrix.data }},front-${{ matrix.front }} -- -D warnings
