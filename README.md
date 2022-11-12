@@ -10,10 +10,10 @@ Zettelkasten is build up out of the following modules:
 
 The following confirmations are available:
 
-|`runtime`  |`data`  |`front`   |
-|-----------|--------|----------|
-|`async-std`|`sqlite`|`terminal`|
-|           |        |`web`     |
+|`runtime`  |`data`    |`front`   |
+|-----------|----------|----------|
+|`async-std`|`sqlite`  |`terminal`|
+|           |`postgres`|          |
 
 Note that these modules can be mixed and matched in any way you want.
 
