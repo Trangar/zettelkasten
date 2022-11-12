@@ -38,6 +38,11 @@ And then run one of:
 
 ## Setup
 
+We highly recommend installing [`sqlx-cli`](https://github.com/launchbadge/sqlx/tree/main/sqlx-cli):
+```bash
+cargo install sqlx-cli --no-default-features --features rustls,sqlite,postgres
+```
+
 Some configs require custom setup instructions
 
 ### `data-sqlite`
