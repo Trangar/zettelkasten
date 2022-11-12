@@ -14,6 +14,7 @@ front-web = ["zettelkasten-web"]
 front-terminal = ["zettelkasten-terminal"]
 
 data-sqlite = ["zettelkasten-sqlite"]
+data-postgres = ["zettelkasten-postgres"]
 
 
 [dependencies]
@@ -21,8 +22,15 @@ dirs = { version = "4.0.0", default-features = false }
 dotenv = { version = "0.15.0", default-features = false }
 zettelkasten-shared = { path = "shared" }
 zettelkasten-sqlite = { path = "data/sqlite", optional = true }
+zettelkasten-postgres = { path = "data/postgres", optional = true }
 zettelkasten-terminal = { path = "front/terminal", optional = true }
 zettelkasten-web = { path = "front/web", optional = true }
 
 [workspace]
-members = ["data/sqlite", "front/terminal", "front/web", "shared"]
+members = [
+    "data/sqlite",
+    "data/postgres",
+    "front/terminal",
+    "front/web",
+    "shared",
+]

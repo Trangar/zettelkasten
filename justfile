@@ -9,7 +9,9 @@ clippy:
 fmt:
     cargo fmt --all
 
-test: test_terminal test_web_sqlite
+check: check_terminal check_web check_web_sqlite
+
+test: test_terminal test_web test_web_sqlite
 
 
 
@@ -39,6 +41,20 @@ test_web_sqlite:
     cargo test --features front-web,data-sqlite,runtime-async-std
 
 
+docs_web:
+    cargo doc --features front-web,data-postgres,runtime-async-std --open
+
+check_web:
+    cargo check --features front-web,data-postgres,runtime-async-std
+
+run_web:
+    cargo run --features front-web,data-postgres,runtime-async-std
+
+test_web:
+    cargo test --features front-web,data-postgres,runtime-async-std
+
+
+
 
 install_terminal:
     cargo install --path . --features front-terminal,data-sqlite,runtime-async-std
@@ -46,3 +62,5 @@ install_terminal:
 prepare_sqlite:
     cd data/sqlite && cargo sqlx prepare -- --features runtime-async-std
 
+prepare_postgres:
+    cd data/postgres && cargo sqlx prepare -- --features runtime-async-std

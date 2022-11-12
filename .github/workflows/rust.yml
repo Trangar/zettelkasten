@@ -9,6 +9,7 @@ jobs:
 
     strategy:
       matrix:
+        data: [sqlite, postgres]
         runtime: [async-std]
         front: [terminal]
 
@@ -24,4 +25,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --features runtime-${{ matrix.runtime }},data-sqlite,front-${{ matrix.front }}
+          args: --features runtime-${{ matrix.runtime }},data-${{ matrix.data }},front-${{ matrix.front }}
