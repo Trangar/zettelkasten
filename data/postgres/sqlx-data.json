@@ -1,0 +1,346 @@
+{
+  "db": "PostgreSQL",
+  "03fc9842b128a53cdf2d13befcbc30b6e1af41678faf707876c9bfdf6bccbecb": {
+    "describe": {
+      "columns": [
+        {
+          "name": "zettel_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "path",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT zettel_id, path FROM zettel WHERE user_id = $1"
+  },
+  "2cca13d8beec78fc030b0eca1fc14d05519abfbf6296eade145e29045224dec1": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_visited_zettel",
+          "ordinal": 3,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT user_id as id, username as name, password, last_visited_zettel FROM users WHERE username = $1"
+  },
+  "4397ef0011176ac38c84cb82ef6676837abbcd27fde5ee1a9c23e387bba76ae0": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE config SET value = $1 WHERE key = $2"
+  },
+  "4648f3f18d24b264086a004a08741331805ca86c844280529c8814f54e04d9b3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "key",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "value",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT key, value FROM config"
+  },
+  "72605e5094ba902e2cf89497032c99339239f2751edc3612ebeb980fcbe9918e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "zettel_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                INSERT INTO zettel (user_id, path, body)\n                VALUES ($1, $2, $3)\n                RETURNING zettel_id\n                "
+  },
+  "9c36c6a4f58140ed042cb5f10e773680ce11dd7132b5a97b264b7a303e9152ca": {
+    "describe": {
+      "columns": [
+        {
+          "name": "zettel_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "path",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "body",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT zettel_id, path, body FROM zettel WHERE user_id = $1 AND path = $2"
+  },
+  "a60c6c114c9fc1ae796d66427e31669aac2f4252a1d3503304b73b4ae15bbfd8": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_visited_zettel",
+          "ordinal": 3,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT user_id as id, username as name, password, last_visited_zettel FROM users"
+  },
+  "a65bcb19ad85d5d33d48ab4828ddec245cbed1e28b7f120616e1cc914eb0e603": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "UPDATE users SET last_visited_zettel = $1 WHERE user_id = $2"
+  },
+  "a77681532bab4c279131dac928910ccf31131a363a9633245055353db8b71047": {
+    "describe": {
+      "columns": [
+        {
+          "name": "zettel_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "path",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "body",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT zettel_id, path, body FROM zettel WHERE zettel_id = $1 AND user_id = $2"
+  },
+  "ac3e83c4b2f818634e44faeb08bc6970c28e91c691434fea5a1898895d1bb1a8": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "UPDATE zettel SET body = $1, PATH = $2 WHERE zettel_id = $3 AND user_id = $4"
+  },
+  "c04b5d95e00a6a58bbf69536707e0784f02a300576d897ed458bcdc8f3c0710f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_count!",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT COUNT(*) as \"user_count!\" FROM users"
+  },
+  "d21b0e7ed55ea152c9110f655c6ab8f979c0e32d14d74e3cc7da1f0158766e0e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_visited_zettel",
+          "ordinal": 3,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO users (username, password)\n            VALUES ($1, $2)\n            RETURNING user_id as id, username as name, password, last_visited_zettel\n            "
+  },
+  "d86dbae3c47e3afee835610471b4fec1c36f926ce0d7fb53be220adf0f445979": {
+    "describe": {
+      "columns": [
+        {
+          "name": "zettel_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "path",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "body",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT zettel_id, path, body FROM zettel WHERE user_id = $1 AND (path ~ $2 OR body ~ $2)"
+  }
+}

@@ -16,6 +16,9 @@ install_terminal:
 prepare_sqlite:
     cd data/sqlite && cargo sqlx prepare -- --features runtime-async-std
 
+prepare_postgres:
+    cd data/postgres && cargo sqlx prepare -- --features runtime-async-std
+
 lint: fmt clippy
 
 clippy:
