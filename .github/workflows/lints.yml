@@ -3,7 +3,7 @@ on: [push]
 name: Lint & clippy
 
 jobs:
-  lints:
+  rustfmt:
     name: Lints
     runs-on: ubuntu-latest
     steps:
