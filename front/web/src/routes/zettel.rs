@@ -1,3 +1,5 @@
+mod filters;
+
 use super::Web;
 use tide::{Request, Result};
 
@@ -32,10 +34,4 @@ pub struct Zettel<'a> {
     pub user: &'a crate::User,
     pub path: &'a str,
     pub body: &'a str,
-}
-
-mod filters {
-    pub fn render(s: &str) -> ::askama::Result<String> {
-        Ok(markdown::to_html(s).replace("\\n", "<br />"))
-    }
 }

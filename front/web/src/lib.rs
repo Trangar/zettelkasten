@@ -109,7 +109,8 @@ pub(crate) fn render_template(tmpl: impl askama::Template) -> tide::Result {
 pub(crate) fn default_zettel() -> storage::Zettel {
     storage::Zettel {
         path: "/home".to_string(),
-        body: r#"Welcome to zettelkasten\n\n**bold**"#.to_string(),
+        body: r#"Welcome to zettelkasten\n\n**bold**\n\n[sys:config]\n\n[config](sys:config)"#
+            .to_string(),
         ..Default::default()
     }
 }
