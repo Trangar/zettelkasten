@@ -56,29 +56,25 @@ impl Writer<'_> {
                 self.out.push('>');
                 Ok(())
             }
-            Tag::BlockQuote => todo!(),
-            Tag::CodeBlock(_) => todo!(),
-            Tag::List(_) => todo!(),
-            Tag::Item => todo!(),
-            Tag::FootnoteDefinition(_) => todo!(),
-            Tag::Table(_) => todo!(),
-            Tag::TableHead => todo!(),
-            Tag::TableRow => todo!(),
-            Tag::TableCell => todo!(),
-            Tag::Emphasis => todo!(),
-            Tag::Strong => todo!(),
-            Tag::Strikethrough => todo!(),
-            Tag::Link(_, _, _) => todo!(),
-            Tag::Image(_, _, _) => todo!(),
+            Tag::Strong => write!(self.out, "<b>"),
+            Tag::Link(_, url, text) => write!(self.out, "<a href=\"{url}\" data-text=\"{text}\">["),
+            tag => todo!("{tag:?}"),
         }
     }
 
-    fn end_tag(&mut self, _parser: &mut Parser, _tag: Tag) -> std::fmt::Result {
-        todo!()
+    fn end_tag(&mut self, _parser: &mut Parser, tag: Tag) -> std::fmt::Result {
+        match tag {
+            Tag::Paragraph => write!(self.out, "</p>"),
+            Tag::Heading(level, ..) => write!(self.out, "</{level}>"),
+            Tag::Strong => write!(self.out, "</b>"),
+            Tag::Link(_, _, _) => write!(self.out, "]</a>"),
+            tag => todo!("{tag:?}"),
+        }
     }
 
-    fn text(&mut self, _parser: &mut Parser, _text: CowStr) -> std::fmt::Result {
-        todo!()
+    fn text(&mut self, _parser: &mut Parser, text: CowStr) -> std::fmt::Result {
+        *self.out += text.as_ref();
+        Ok(())
     }
 
     fn code(&mut self, _parser: &mut Parser, _code: CowStr) -> std::fmt::Result {
