@@ -1,0 +1,43 @@
+html,
+body {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+#content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.flex {
+    display: flex;
+    flex-grow: 1;
+}
+
+.zettel {
+    width: 800px;
+}
+
+.edit_zettel {
+    display: none;
+    flex-grow: 1;
+    /* textareas are 5px larger than their parents for god-knows why */
+    /* so we fix that here */
+    padding-right: 5px;
+    padding-bottom: 5px;
+}
+
+.edit_zettel>textarea {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+.footer {
+    width: 100%;
+    flex-grow: 0;
+}

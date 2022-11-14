@@ -2,7 +2,8 @@ use crossterm::event::KeyCode;
 use snafu::ResultExt;
 use std::{
     collections::HashMap,
-    io::{Read, Seek, SeekFrom, Write},
+    fmt::{self, Write as _},
+    io::{Read, Seek, SeekFrom, Write as _},
 };
 use tui::{
     style::{Color, Style},
@@ -36,7 +37,7 @@ impl Default for RenderStyle {
 }
 
 pub struct ParsedZettel<'a> {
-    pub links: HashMap<String, &'a str>,
+    pub links: HashMap<Naming, &'a str>,
     pub link_char_size: usize,
     pub lines: Vec<Spans<'a>>,
 }
@@ -147,29 +148,67 @@ impl NamingScheme {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Naming {
+    Single(char),
+    Double(char, char),
+}
+
+impl Naming {
+    fn len(self) -> usize {
+        match self {
+            Self::Single(_) => 1,
+            Self::Double(_, _) => 2,
+        }
+    }
+}
+
+impl From<&str> for Naming {
+    fn from(s: &str) -> Naming {
+        match s.as_bytes() {
+            [first] => Naming::Single(*first as char),
+            [first, second] => Naming::Double(*first as char, *second as char),
+            _ => panic!("Unimplemented; string length {} to Naming", s.len()),
+        }
+    }
+}
+
+impl fmt::Display for Naming {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Single(c) => f.write_char(*c),
+            Self::Double(first, second) => {
+                f.write_char(*first)?;
+                f.write_char(*second)?;
+                Ok(())
+            }
+        }
+    }
+}
+
 impl Iterator for NamingScheme {
-    type Item = String;
+    type Item = Naming;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Single { idx, chars } => {
-                let result = chars.get(*idx)?.to_string();
+                let result = *chars.get(*idx)?;
                 *idx += 1;
-                Some(result)
+                Some(Naming::Single(result))
             }
             Self::Double {
                 first_idx,
                 second_idx,
                 chars,
             } => {
-                let first = chars.get(*first_idx)?;
-                let second = chars.get(*second_idx)?;
+                let first = *chars.get(*first_idx)?;
+                let second = *chars.get(*second_idx)?;
                 *second_idx += 1;
                 if *second_idx >= chars.len() {
                     *second_idx = 0;
                     *first_idx += 1;
                 }
-                Some(format!("{}{}", first, second))
+                Some(Naming::Double(first, second))
             }
         }
     }

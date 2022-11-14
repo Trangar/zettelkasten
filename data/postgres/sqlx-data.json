@@ -253,6 +253,44 @@
     },
     "query": "UPDATE zettel SET body = $1, PATH = $2 WHERE zettel_id = $3 AND user_id = $4"
   },
+  "b83d4febca265b16e681cea5081bd87c6aa4910ab7cf00ff5ce1978f8e8344a3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "password",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_visited_zettel",
+          "ordinal": 3,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "SELECT user_id as id, username as name, password, last_visited_zettel FROM users WHERE user_id = $1"
+  },
   "c04b5d95e00a6a58bbf69536707e0784f02a300576d897ed458bcdc8f3c0710f": {
     "describe": {
       "columns": [

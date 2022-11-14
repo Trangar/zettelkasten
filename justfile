@@ -1,6 +1,20 @@
 default:
     just --list
 
+lint: fmt clippy
+
+clippy:
+    cargo clippy --features front-terminal,front-web,data-sqlite,runtime-async-std -- -D warnings
+
+fmt:
+    cargo fmt --all
+
+check: check_terminal check_web check_web_sqlite
+
+test: test_terminal test_web test_web_sqlite
+
+
+
 docs_terminal:
     cargo doc --features front-terminal,data-sqlite,runtime-async-std --open
 
@@ -10,6 +24,38 @@ check_terminal:
 run_terminal:
     cargo run --features front-terminal,data-sqlite,runtime-async-std
 
+test_terminal:
+    cargo test --features front-terminal,data-sqlite,runtime-async-std --workspace
+
+
+docs_web_sqlite:
+    cargo doc --features front-web,data-sqlite,runtime-async-std --open
+
+check_web_sqlite:
+    cargo check --features front-web,data-sqlite,runtime-async-std
+
+run_web_sqlite:
+    cargo run --features front-web,data-sqlite,runtime-async-std
+
+test_web_sqlite:
+    cargo test --features front-web,data-sqlite,runtime-async-std
+
+
+docs_web:
+    cargo doc --features front-web,data-postgres,runtime-async-std --open
+
+check_web:
+    cargo check --features front-web,data-postgres,runtime-async-std
+
+run_web:
+    cargo run --features front-web,data-postgres,runtime-async-std
+
+test_web:
+    cargo test --features front-web,data-postgres,runtime-async-std
+
+
+
+
 install_terminal:
     cargo install --path . --features front-terminal,data-sqlite,runtime-async-std
 
@@ -18,16 +64,3 @@ prepare_sqlite:
 
 prepare_postgres:
     cd data/postgres && cargo sqlx prepare -- --features runtime-async-std
-
-lint: fmt clippy
-
-clippy:
-    cargo clippy --features front-terminal,data-sqlite,runtime-async-std -- -D warnings
-
-fmt:
-    cargo fmt --all
-
-test: test_async_std
-
-test_async_std:
-    cargo test --features front-terminal,data-sqlite,runtime-async-std --workspace

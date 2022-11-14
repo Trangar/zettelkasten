@@ -1,0 +1,24 @@
+{% extends "_layout.html" %}
+
+{% block title %}{{ path }}{% endblock %}
+
+{% block head %}
+<script type="text/javascript" src="static/script.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="flex">
+    <div class="zettel">
+        {{ body|render|safe }}
+    </div>
+    <div class="edit_zettel">
+        <textarea>{{ body }}</textarea>
+    </div>
+</div>
+<p class="footer">
+    <bold>
+        A: All zettels, C: config, E: edit, F: follow link, L: log out, S: search
+    </bold>
+</p>
+
+{% endblock %}

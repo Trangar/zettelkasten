@@ -11,6 +11,8 @@ pub trait Storage: Send + Sync {
     async fn login_single_user(&self) -> Result<User, Error>;
     async fn login(&self, username: &str, password: &str) -> Result<Option<User>, Error>;
     async fn register(&self, username: &str, password: &str) -> Result<User, Error>;
+    async fn get_user_by_id(&self, id: UserId) -> Result<User, Error>;
+
     async fn get_zettels(
         &self,
         user: UserId,
@@ -24,6 +26,7 @@ pub trait Storage: Send + Sync {
         user: UserId,
         zettel_id: Option<ZettelId>,
     ) -> Result<(), Error>;
+
     async fn update_config(&self, config: &SystemConfig) -> Result<(), Error>;
 }
 

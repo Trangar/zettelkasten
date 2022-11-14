@@ -7,9 +7,14 @@ use std::future::Future;
 use std::sync::Arc;
 use storage::SystemConfig;
 
+#[async_trait]
 pub trait Front: Send + Sync {
-    type Config: serde::ser::Serialize + serde::de::DeserializeOwned + Default;
-    fn run(config: Self::Config, system_config: SystemConfig, storage: Arc<dyn storage::Storage>);
+    type Config;
+    async fn run(
+        config: Self::Config,
+        system_config: SystemConfig,
+        storage: Arc<dyn storage::Storage>,
+    );
 }
 
 #[cfg(feature = "runtime-async-std")]
@@ -18,4 +23,12 @@ where
     F: Future<Output = RET>,
 {
     async_std::task::block_on(f)
+}
+
+#[cfg(feature = "runtime-async-std")]
+pub fn spawn_blocking<F>(f: F) -> impl Future<Output = ()>
+where
+    F: FnOnce() + Send + 'static,
+{
+    async_std::task::spawn_blocking(f)
 }

@@ -74,6 +74,17 @@ impl Storage for Connection {
         .context(SqlxSnafu)
     }
 
+    async fn get_user_by_id(&self, id: UserId) -> Result<User, Error> {
+        let mut conn = self.conn.acquire().await.context(SqlxSnafu)?;
+        let query = sqlx::query_as!(
+            User,
+            "SELECT user_id as id, username as name, password, last_visited_zettel FROM users WHERE user_id = $1",
+            id
+        );
+
+        query.fetch_one(&mut conn).await.context(SqlxSnafu)
+    }
+
     async fn get_zettels(
         &self,
         user: UserId,

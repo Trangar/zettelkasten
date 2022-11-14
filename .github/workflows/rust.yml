@@ -11,7 +11,7 @@ jobs:
       matrix:
         data: [sqlite, postgres]
         runtime: [async-std]
-        front: [terminal]
+        front: [terminal, web]
 
     steps:
       - uses: actions/checkout@v3

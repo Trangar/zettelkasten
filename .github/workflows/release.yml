@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         data: [sqlite, postgres]
-        front: [terminal]
+        front: [terminal, web]
 
     steps:
       - name: Checkout sources
@@ -57,7 +57,7 @@ jobs:
     strategy:
       matrix:
         data: [sqlite, postgres]
-        front: [terminal]
+        front: [terminal, web]
 
     steps:
       - name: Checkout sources
