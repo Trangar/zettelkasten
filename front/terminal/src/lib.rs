@@ -4,7 +4,7 @@
 mod view;
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
+    event::KeyCode,
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -45,8 +45,8 @@ impl Front for Tui<'_> {
     ) {
         enable_raw_mode().expect("Could not enable raw mode");
         let mut stdout = std::io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
-            .expect("Could not enable alternate screen and mouse capture");
+        execute!(stdout, EnterAlternateScreen)
+            .expect("Could not enable alternate screen");
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).expect("Could not instantiate the terminal");
@@ -83,7 +83,6 @@ impl Drop for Tui<'_> {
         if !std::thread::panicking() {
             drop(self.terminal.backend_mut().execute(LeaveAlternateScreen));
         }
-        drop(self.terminal.backend_mut().execute(DisableMouseCapture));
         drop(self.terminal.show_cursor());
     }
 }
