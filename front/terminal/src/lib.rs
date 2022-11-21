@@ -45,8 +45,7 @@ impl Front for Tui<'_> {
     ) {
         enable_raw_mode().expect("Could not enable raw mode");
         let mut stdout = std::io::stdout();
-        execute!(stdout, EnterAlternateScreen)
-            .expect("Could not enable alternate screen");
+        execute!(stdout, EnterAlternateScreen).expect("Could not enable alternate screen");
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).expect("Could not instantiate the terminal");
