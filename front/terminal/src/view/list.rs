@@ -33,10 +33,7 @@ impl List {
         })
     }
 
-    pub(crate) fn render<'a>(
-        &'a mut self,
-        tui: &mut crate::Tui,
-    ) -> super::Result<Option<Transition>> {
+    pub(crate) fn render(&mut self, tui: &mut crate::Tui) -> super::Result<Option<Transition>> {
         loop {
             let links: Vec<&storage::ZettelHeader> = if self.search.trim().is_empty() {
                 self.links.iter().collect()
