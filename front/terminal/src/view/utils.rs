@@ -2,7 +2,7 @@ use crossterm::event::KeyCode;
 use snafu::ResultExt;
 use std::{
     collections::HashMap,
-    io::{Read, Seek, SeekFrom, Write},
+    io::{Read, Seek, Write},
 };
 use tui::{
     style::{Color, Style},
@@ -169,16 +169,14 @@ impl Iterator for NamingScheme {
                     *second_idx = 0;
                     *first_idx += 1;
                 }
-                Some(format!("{}{}", first, second))
+                Some(format!("{first}{second}"))
             }
         }
     }
 }
 
 pub fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> super::Result<Option<String>> {
-    let editor = if let Some(editor) = &tui.system_config.terminal_editor {
-        editor
-    } else {
+    let Some(editor) = &tui.system_config.terminal_editor else {
         super::alert(tui.terminal, |cb| {
             cb.title("Could not edit zettel")
                 .text("No terminal editor configured")
@@ -199,7 +197,7 @@ pub fn edit(zettel: &storage::Zettel, tui: &mut crate::Tui) -> super::Result<Opt
         .status()
         .context(super::IoSnafu)?;
 
-    tmp_file.seek(SeekFrom::Start(0)).context(super::IoSnafu)?;
+    tmp_file.rewind().context(super::IoSnafu)?;
     let mut result = String::new();
     tmp_file
         .read_to_string(&mut result)
