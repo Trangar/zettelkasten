@@ -11,7 +11,7 @@ runtime-async-std = [
 
 [dependencies]
 async-lock = { version = "2.5.0", default-features = false }
-bcrypt = { version = "0.13.0", default-features = false, features = ["alloc"] }
+bcrypt = { version = "0.14.0", default-features = false, features = ["alloc"] }
 serde_json = { version = "1.0.93", default-features = false }
 snafu = { version = "0.7.4", default-features = false }
 zettelkasten-shared = { version = "0.1.1", path = "../../shared" }
