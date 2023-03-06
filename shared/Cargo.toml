@@ -15,7 +15,7 @@ bcrypt = { version = "0.14.0", default-features = false, features = ["std"] }
 custom_debug = { version = "0.5.0", default-features = false }
 futures = { version = "0.3.26", default-features = false, features = ["alloc"] }
 serde = { version = "1.0.152", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.93", default-features = false }
+serde_json = { version = "1.0.94", default-features = false }
 snafu = { version = "0.7.4", features = ["std"], default-features = false }
 regex = { version = "1.7.1", default-features = false }
 
