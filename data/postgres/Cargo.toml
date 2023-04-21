@@ -17,7 +17,7 @@ snafu = { version = "0.7.4", default-features = false }
 zettelkasten-shared = { version = "0.1.1", path = "../../shared" }
 
 [dependencies.regex]
-version = "1.7.1"
+version = "1.8.0"
 default-features = false
 features = ["perf", "std"]
 
